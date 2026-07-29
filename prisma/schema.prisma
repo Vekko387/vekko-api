@@ -8,3 +8,50 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum Role {
+  CUSTOMER
+  PARTNER_OWNER
+  PARTNER_MANAGER
+  PARTNER_EMPLOYEE
+  SUPER_ADMIN
+  ADMIN
+  SUPORTE
+  FINANCEIRO
+  COMERCIAL
+  OPERACOES
+}
+
+model User {
+  id          String       @id @default(uuid()) @db.Uuid
+  firebaseUid String       @unique(map: "users_firebase_uid_key") @map("firebase_uid") @db.VarChar(128)
+  email       String?      @db.VarChar(320)
+  profile     UserProfile?
+  roles       UserRole[]
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("users")
+}
+
+model UserProfile {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @unique(map: "user_profiles_user_id_key") @map("user_id") @db.Uuid
+  cpfNormalized String?  @unique(map: "user_profiles_cpf_normalized_key") @map("cpf_normalized") @db.VarChar(11)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("user_profiles")
+}
+
+model UserRole {
+  userId     String   @map("user_id") @db.Uuid
+  role       Role
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz(3)
+
+  @@id([userId, role])
+  @@index([role], map: "user_roles_role_idx")
+  @@map("user_roles")
+}
