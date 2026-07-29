@@ -6,8 +6,7 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-RUN --mount=type=cache,id=vekko-pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 FROM node:24-alpine AS builder
 
