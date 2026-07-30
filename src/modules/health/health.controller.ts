@@ -13,6 +13,7 @@ import {
 } from '@nestjs/terminus';
 import { SkipThrottle } from '@nestjs/throttler';
 import { PrismaService } from '../../database/prisma.service';
+import { Public } from '../auth/decorators/public.decorator';
 import { RedisHealthIndicator } from './indicators/redis.health-indicator';
 
 type LivenessResponse = {
@@ -26,6 +27,7 @@ type LivenessResponse = {
 
 @ApiTags('health')
 @Controller('health')
+@Public()
 @SkipThrottle()
 export class HealthController {
   constructor(
