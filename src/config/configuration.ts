@@ -20,12 +20,21 @@ export default () => ({
     },
   },
   database: {
-    url:
-      process.env.DATABASE_URL ??
-      'postgresql://postgres:postgres@localhost:5432/vekko',
+    url: process.env.DATABASE_URL,
+  },
+  firebase: {
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY,
+    projectId: process.env.FIREBASE_PROJECT_ID,
+  },
+  health: {
+    dependencyTimeoutMs: Number(
+      process.env.DEPENDENCY_HEALTH_TIMEOUT_MS ?? 2_000,
+    ),
   },
   redis: {
-    keyPrefix: process.env.REDIS_KEY_PREFIX ?? 'vekko',
-    url: process.env.REDIS_URL ?? 'redis://localhost:6379',
+    connectTimeoutMs: Number(process.env.REDIS_CONNECT_TIMEOUT_MS ?? 5_000),
+    keyPrefix: process.env.REDIS_KEY_PREFIX ?? 'vekko:development',
+    url: process.env.REDIS_URL,
   },
 });

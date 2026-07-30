@@ -10,30 +10,51 @@ assinaturas, benefícios, pagamentos, parceiros, atendimentos, recebíveis e
 auditoria. Os frontends nunca acessam banco ou integrações sensíveis
 diretamente.
 
-## Desenvolvimento
+## Pré-requisitos
+
+- Node.js 24;
+- pnpm 11 via Corepack;
+- Docker Desktop com Docker Compose.
+
+## Desenvolvimento local
 
 ```powershell
 corepack pnpm install
-Copy-Item .env.example .env
-corepack pnpm prisma:generate
+corepack pnpm infra:setup
+corepack pnpm infra:up
+corepack pnpm prisma:migrate:dev
 corepack pnpm start:dev
 ```
 
-Endpoints iniciais:
+O setup gera credenciais locais em arquivos ignorados pelo Git. Não copie
+credenciais reais para `.env.example`.
+
+## Endpoints
 
 - API: `http://localhost:3000/api/v1`
-- Health check: `http://localhost:3000/api/v1/health`
+- Liveness: `http://localhost:3000/api/v1/health/live`
+- Readiness: `http://localhost:3000/api/v1/health/ready`
+- Usuário autenticado: `http://localhost:3000/api/v1/auth/me`
 - Swagger: `http://localhost:3000/docs`
+
+Todas as rotas são privadas por padrão. Somente rotas explicitamente marcadas
+com `@Public()` podem ser acessadas sem um Firebase ID Token.
 
 ## Qualidade
 
 ```powershell
+corepack pnpm prisma:validate
+corepack pnpm format:check
 corepack pnpm lint
 corepack pnpm typecheck
-corepack pnpm test
-corepack pnpm test:e2e
+corepack pnpm test --runInBand
+corepack pnpm test:e2e --runInBand
 corepack pnpm build
 ```
 
-As entidades e migrações de negócio serão implementadas nas fases seguintes,
-respeitando o Documento Mestre da VEKKO.
+Os testes E2E exigem PostgreSQL e Redis locais em execução.
+
+## Ambientes
+
+As configurações de development, test, staging e production estão documentadas
+em [`docs/ENVIRONMENTS.md`](docs/ENVIRONMENTS.md).
