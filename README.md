@@ -34,7 +34,11 @@ credenciais reais para `.env.example`.
 - API: `http://localhost:3000/api/v1`
 - Liveness: `http://localhost:3000/api/v1/health/live`
 - Readiness: `http://localhost:3000/api/v1/health/ready`
+- Usuário autenticado: `http://localhost:3000/api/v1/auth/me`
 - Swagger: `http://localhost:3000/docs`
+
+Todas as rotas são privadas por padrão. Somente rotas explicitamente marcadas
+com `@Public()` podem ser acessadas sem um Firebase ID Token.
 
 ## Qualidade
 

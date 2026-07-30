@@ -33,7 +33,15 @@ async function bootstrap() {
     .setTitle('VEKKO API')
     .setDescription('Contrato REST oficial da plataforma VEKKO.')
     .setVersion('1.0')
-    .addBearerAuth()
+    .addBearerAuth(
+      {
+        bearerFormat: 'Firebase ID Token',
+        description: 'Firebase ID Token emitido para o projeto deste ambiente.',
+        scheme: 'bearer',
+        type: 'http',
+      },
+      'firebase',
+    )
     .build();
 
   const openApiDocument = () =>

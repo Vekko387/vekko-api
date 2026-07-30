@@ -22,6 +22,11 @@ export default () => ({
   database: {
     url: process.env.DATABASE_URL,
   },
+  firebase: {
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY,
+    projectId: process.env.FIREBASE_PROJECT_ID,
+  },
   health: {
     dependencyTimeoutMs: Number(
       process.env.DEPENDENCY_HEALTH_TIMEOUT_MS ?? 2_000,

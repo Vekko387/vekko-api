@@ -23,6 +23,9 @@ jobs:
       CORS_ORIGINS: ''
       DATABASE_URL: postgresql://vekko:vekko_ci@127.0.0.1:5432/vekko_test
       DEPENDENCY_HEALTH_TIMEOUT_MS: 2000
+      FIREBASE_CLIENT_EMAIL: firebase-admin-test@vekko-test.iam.gserviceaccount.com
+      FIREBASE_PRIVATE_KEY: not-used-because-firebase-is-mocked-in-tests
+      FIREBASE_PROJECT_ID: vekko-test
       NODE_ENV: test
       REDIS_CONNECT_TIMEOUT_MS: 5000
       REDIS_KEY_PREFIX: vekko:ci

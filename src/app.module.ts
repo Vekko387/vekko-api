@@ -9,6 +9,9 @@ import {
 } from './config/environment';
 import { envValidationSchema } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { FirebaseAuthGuard } from './modules/auth/guards/firebase-auth.guard';
+import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { HealthModule } from './modules/health/health.module';
 import { QueuesModule } from './queues/queues.module';
 import { RedisModule } from './redis/redis.module';
@@ -39,12 +42,21 @@ import { RedisModule } from './redis/redis.module';
     DatabaseModule,
     RedisModule,
     QueuesModule,
+    AuthModule,
     HealthModule,
   ],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: FirebaseAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
   ],
 })

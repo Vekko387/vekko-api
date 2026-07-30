@@ -10,6 +10,9 @@ export const envValidationSchema = Joi.object({
     .integer()
     .positive()
     .default(2_000),
+  FIREBASE_CLIENT_EMAIL: Joi.string().email().required(),
+  FIREBASE_PRIVATE_KEY: Joi.string().min(1).required(),
+  FIREBASE_PROJECT_ID: Joi.string().trim().min(1).required(),
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'staging', 'production')
     .default('development'),

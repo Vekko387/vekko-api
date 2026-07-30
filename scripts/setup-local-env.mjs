@@ -47,6 +47,10 @@ const createTestEnvironment = (postgresPassword, redisPassword) => {
     'REDIS_KEY_PREFIX=vekko:test',
     'REDIS_CONNECT_TIMEOUT_MS=5000',
     '',
+    'FIREBASE_PROJECT_ID=vekko-test',
+    'FIREBASE_CLIENT_EMAIL=firebase-admin-test@vekko-test.iam.gserviceaccount.com',
+    'FIREBASE_PRIVATE_KEY=not-used-because-firebase-is-mocked-in-tests',
+    '',
     'DEPENDENCY_HEALTH_TIMEOUT_MS=2000',
     '',
     'THROTTLE_LIMIT=100',
@@ -121,6 +125,11 @@ const applicationEnvironment = [
   'REDIS_KEY_PREFIX=vekko:development',
   'REDIS_CONNECT_TIMEOUT_MS=5000',
   '',
+  '# Preencha com uma conta de serviço exclusiva do Firebase development.',
+  'FIREBASE_PROJECT_ID=',
+  'FIREBASE_CLIENT_EMAIL=',
+  'FIREBASE_PRIVATE_KEY=',
+  '',
   'DEPENDENCY_HEALTH_TIMEOUT_MS=2000',
   '',
   'THROTTLE_LIMIT=100',
@@ -147,6 +156,6 @@ writeFileSync(
 
 process.stdout.write(
   shouldRotateSecrets
-    ? 'Credenciais locais rotacionadas sem exibição. Execute "pnpm infra:up".\n'
-    : 'Ambiente local criado sem exibir credenciais. Execute "pnpm infra:up".\n',
+    ? 'Credenciais locais rotacionadas sem exibição. Configure o Firebase development e execute "pnpm infra:up".\n'
+    : 'Ambiente local criado sem exibir credenciais. Configure o Firebase development e execute "pnpm infra:up".\n',
 );
