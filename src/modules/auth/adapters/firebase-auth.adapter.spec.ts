@@ -15,7 +15,10 @@ describe('FirebaseAuthAdapter', () => {
   beforeEach(() => {
     verifyIdToken = jest.fn();
     firebaseAuthClient = {
+      createUser: jest.fn(),
+      findUserByEmail: jest.fn(),
       getUser: jest.fn(),
+      updateUser: jest.fn(),
       verifyIdToken,
     };
     adapter = new FirebaseAuthAdapter(

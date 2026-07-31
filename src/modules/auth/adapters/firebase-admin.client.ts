@@ -1,12 +1,24 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { App } from 'firebase-admin/app';
-import type { Auth, DecodedIdToken, UserRecord } from 'firebase-admin/auth';
+import type {
+  Auth,
+  CreateRequest,
+  DecodedIdToken,
+  UpdateRequest,
+  UserRecord,
+} from 'firebase-admin/auth';
 
 export const FIREBASE_AUTH_CLIENT = Symbol('FIREBASE_AUTH_CLIENT');
 
 export interface FirebaseAuthClient {
+  createUser(properties: CreateRequest): Promise<UserRecord>;
+  findUserByEmail(email: string): Promise<UserRecord | null>;
   getUser(firebaseUid: string): Promise<UserRecord>;
+  updateUser(
+    firebaseUid: string,
+    properties: UpdateRequest,
+  ): Promise<UserRecord>;
   verifyIdToken(
     idToken: string,
     checkRevoked: boolean,
@@ -22,10 +34,44 @@ export class FirebaseAdminClient
 
   constructor(private readonly configService: ConfigService) {}
 
+  async createUser(properties: CreateRequest): Promise<UserRecord> {
+    const firebaseAuth = await this.getFirebaseAuth();
+
+    return firebaseAuth.createUser(properties);
+  }
+
+  async findUserByEmail(email: string): Promise<UserRecord | null> {
+    const firebaseAuth = await this.getFirebaseAuth();
+
+    try {
+      return await firebaseAuth.getUserByEmail(email);
+    } catch (error) {
+      const firebaseError =
+        typeof error === 'object' && error !== null
+          ? (error as Record<string, unknown>)
+          : undefined;
+
+      if (firebaseError?.code === 'auth/user-not-found') {
+        return null;
+      }
+
+      throw error;
+    }
+  }
+
   async getUser(firebaseUid: string): Promise<UserRecord> {
     const firebaseAuth = await this.getFirebaseAuth();
 
     return firebaseAuth.getUser(firebaseUid);
+  }
+
+  async updateUser(
+    firebaseUid: string,
+    properties: UpdateRequest,
+  ): Promise<UserRecord> {
+    const firebaseAuth = await this.getFirebaseAuth();
+
+    return firebaseAuth.updateUser(firebaseUid, properties);
   }
 
   async verifyIdToken(

@@ -26,6 +26,7 @@ export default () => ({
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
     privateKey: process.env.FIREBASE_PRIVATE_KEY,
     projectId: process.env.FIREBASE_PROJECT_ID,
+    webApiKey: process.env.FIREBASE_WEB_API_KEY,
   },
   health: {
     dependencyTimeoutMs: Number(

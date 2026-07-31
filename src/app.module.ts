@@ -13,6 +13,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { FirebaseAuthGuard } from './modules/auth/guards/firebase-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { HealthModule } from './modules/health/health.module';
+import { PartnersModule } from './modules/partners/partners.module';
 import { QueuesModule } from './queues/queues.module';
 import { RedisModule } from './redis/redis.module';
 
@@ -43,6 +44,7 @@ import { RedisModule } from './redis/redis.module';
     RedisModule,
     QueuesModule,
     AuthModule,
+    PartnersModule,
     HealthModule,
   ],
   providers: [
