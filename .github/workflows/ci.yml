@@ -4,10 +4,12 @@ on:
   pull_request:
     branches:
       - main
+      - develop
   push:
     branches:
       - main
-      - 'feature/**'
+      - develop
+      - 'feat/**'
   workflow_dispatch:
 
 permissions:
@@ -26,6 +28,7 @@ jobs:
       FIREBASE_CLIENT_EMAIL: firebase-admin-test@vekko-test.iam.gserviceaccount.com
       FIREBASE_PRIVATE_KEY: not-used-because-firebase-is-mocked-in-tests
       FIREBASE_PROJECT_ID: vekko-test
+      FIREBASE_WEB_API_KEY: not-used-because-firebase-is-mocked-in-tests
       NODE_ENV: test
       REDIS_CONNECT_TIMEOUT_MS: 5000
       REDIS_KEY_PREFIX: vekko:ci

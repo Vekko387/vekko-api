@@ -35,10 +35,19 @@ credenciais reais para `.env.example`.
 - Liveness: `http://localhost:3000/api/v1/health/live`
 - Readiness: `http://localhost:3000/api/v1/health/ready`
 - Usuário autenticado: `http://localhost:3000/api/v1/auth/me`
+- Solicitação pública de parceiro: `POST http://localhost:3000/api/v1/partner-applications`
+- Análise administrativa: `http://localhost:3000/api/v1/admin/partner-applications`
 - Swagger: `http://localhost:3000/docs`
 
 Todas as rotas são privadas por padrão. Somente rotas explicitamente marcadas
 com `@Public()` podem ser acessadas sem um Firebase ID Token.
+
+O onboarding público se aplica somente a parceiros. A solicitação não cria
+Firebase User nem atribui role. Apenas `ADMIN` ou `SUPER_ADMIN` pode aprová-la;
+nesse momento a API cria o parceiro, vincula o proprietário, atribui
+`PARTNER_OWNER` no PostgreSQL e solicita ao Firebase o e-mail padrão para
+definição da senha. O fluxo automático de clientes como `CUSTOMER` permanece
+independente.
 
 ## Qualidade
 

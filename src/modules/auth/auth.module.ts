@@ -18,6 +18,11 @@ import { UsersService } from './services/users.service';
     UsersService,
     StagingUserProvisionerService,
   ],
-  exports: [FirebaseAuthAdapter, StagingUserProvisionerService, UsersService],
+  exports: [
+    FIREBASE_AUTH_CLIENT,
+    FirebaseAuthAdapter,
+    StagingUserProvisionerService,
+    UsersService,
+  ],
 })
 export class AuthModule {}
