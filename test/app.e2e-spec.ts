@@ -1,4 +1,9 @@
-import { Controller, Get, INestApplication } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  INestApplication,
+  ValidationPipe,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
@@ -29,6 +34,7 @@ describe('Infrastructure health (e2e)', () => {
   let app: INestApplication<App>;
   let prismaService: PrismaService;
   const authenticatedFirebaseUid = `e2e-auth-${randomUUID()}`;
+  const partnerApplicationCnpj = '11222333000181';
   const firebaseAuthAdapter = {
     getUserIdentity: jest.fn(),
     verifyIdToken: jest.fn(
@@ -61,8 +67,18 @@ describe('Infrastructure health (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(
+      new ValidationPipe({
+        forbidNonWhitelisted: true,
+        transform: true,
+        whitelist: true,
+      }),
+    );
     await app.init();
     prismaService = app.get(PrismaService);
+    await prismaService.partnerApplication.deleteMany({
+      where: { cnpjNormalized: partnerApplicationCnpj },
+    });
   });
 
   it('reports process liveness', async () => {
@@ -147,6 +163,57 @@ describe('Infrastructure health (e2e)', () => {
       .expect(403);
   });
 
+  it('accepts a public partner application without Firebase authentication', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/partner-applications')
+      .send({
+        addressNumber: '123',
+        businessCategory: 'Centro automotivo',
+        city: 'Fortaleza',
+        cnpj: partnerApplicationCnpj,
+        contactEmail: 'partner.application.e2e@vekko.test',
+        contactPhone: '85999999999',
+        legalName: 'Parceiro E2E LTDA',
+        neighborhood: 'Aldeota',
+        postalCode: '60160120',
+        responsibleName: 'Parceiro E2E',
+        serviceDescription: 'Serviços automotivos para o teste E2E.',
+        state: 'CE',
+        street: 'Avenida Exemplo',
+        termsAccepted: true,
+        tradeName: 'Auto Center E2E',
+      })
+      .expect(201)
+      .expect(
+        ({
+          body,
+        }: {
+          body: {
+            id: string;
+            reviewDeadlineAt: string;
+            status: string;
+            submittedAt: string;
+          };
+        }) => {
+          expect(body.id).toEqual(expect.any(String));
+          expect(body.status).toBe('PENDING_REVIEW');
+          expect(new Date(body.reviewDeadlineAt).getTime()).toBe(
+            new Date(body.submittedAt).getTime() + 48 * 60 * 60 * 1_000,
+          );
+        },
+      );
+  });
+
+  it('protects partner application review endpoints', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/admin/partner-applications')
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/api/v1/admin/partner-applications')
+      .set('Authorization', 'Bearer valid-token')
+      .expect(403);
+  });
+
   it('persists the minimum authentication foundation', async () => {
     const firebaseUid = `e2e-${randomUUID()}`;
 
@@ -180,6 +247,9 @@ describe('Infrastructure health (e2e)', () => {
 
   afterAll(async () => {
     if (prismaService) {
+      await prismaService.partnerApplication.deleteMany({
+        where: { cnpjNormalized: partnerApplicationCnpj },
+      });
       await prismaService.user.deleteMany({
         where: {
           firebaseUid: authenticatedFirebaseUid,

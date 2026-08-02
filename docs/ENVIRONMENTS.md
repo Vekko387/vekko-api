@@ -27,6 +27,7 @@ em `.env.development.local`:
 FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
+FIREBASE_WEB_API_KEY=
 ```
 
 `FIREBASE_PRIVATE_KEY` aceita as quebras de linha escapadas como `\n`. Nunca
@@ -64,6 +65,7 @@ REDIS_CONNECT_TIMEOUT_MS=5000
 FIREBASE_PROJECT_ID=<firebase-staging-project-id>
 FIREBASE_CLIENT_EMAIL=<firebase-staging-client-email>
 FIREBASE_PRIVATE_KEY=<firebase-staging-private-key>
+FIREBASE_WEB_API_KEY=<firebase-staging-web-api-key>
 DEPENDENCY_HEALTH_TIMEOUT_MS=2000
 THROTTLE_LIMIT=100
 THROTTLE_TTL_MS=60000
@@ -72,9 +74,11 @@ THROTTLE_TTL_MS=60000
 `CORS_ORIGINS` deve receber somente os domínios reais dos frontends de staging.
 Enquanto estiver vazio, chamadas cross-origin permanecem bloqueadas.
 
-As três variáveis `FIREBASE_*` devem ser secrets do serviço `vekko-api`. Use uma
-conta de serviço exclusiva de staging e habilite o provider Email/Senha no
-Firebase Authentication.
+As credenciais da conta de serviço devem ser secrets do `vekko-api`. A
+`FIREBASE_WEB_API_KEY` é a chave pública do app Web de staging e é usada para o
+Firebase enviar o e-mail padrão de definição de senha depois da aprovação de um
+parceiro. Use uma conta de serviço exclusiva de staging e habilite o provider
+Email/Senha no Firebase Authentication.
 
 Depois do deploy, usuários internos são provisionados somente pelo shell do
 serviço no Railway. O comando confirma que o UID existe no Firebase de staging
