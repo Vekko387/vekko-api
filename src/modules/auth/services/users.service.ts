@@ -110,14 +110,26 @@ export class UsersService {
   }
 
   private toAuthenticatedUser(user: UserWithAuthRelations): AuthenticatedUser {
+    const profile = user.profile;
+
     return {
       email: user.email,
       firebaseUid: user.firebaseUid,
       id: user.id,
-      profile: user.profile?.cpfNormalized
-        ? { cpfNormalized: user.profile.cpfNormalized }
-        : {},
+      profile: {
+        ...(profile?.cpfNormalized
+          ? { cpfNormalized: profile.cpfNormalized }
+          : {}),
+        ...(profile?.fullName ? { fullName: profile.fullName } : {}),
+        ...(profile?.phoneNormalized
+          ? { phoneNormalized: profile.phoneNormalized }
+          : {}),
+        ...(profile?.profileCompletedAt
+          ? { profileCompletedAt: profile.profileCompletedAt }
+          : {}),
+      },
       roles: user.roles.map(({ role }) => role).sort(),
+      status: user.status,
     };
   }
 }
