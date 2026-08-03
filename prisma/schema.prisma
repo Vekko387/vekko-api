@@ -22,6 +22,23 @@ enum Role {
   OPERACOES
 }
 
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+}
+
+enum VehicleType {
+  HATCH
+  SEDAN
+  SUV
+  PICKUP
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum PartnerApplicationStatus {
   PENDING_REVIEW
   APPROVED
@@ -43,25 +60,53 @@ model User {
   id                          String               @id @default(uuid()) @db.Uuid
   firebaseUid                 String               @unique(map: "users_firebase_uid_key") @map("firebase_uid") @db.VarChar(128)
   email                       String?              @db.VarChar(320)
+  status                      UserStatus           @default(ACTIVE)
   profile                     UserProfile?
   roles                       UserRole[]
+  vehicles                    Vehicle[]
   partnerMemberships          PartnerMember[]
   reviewedPartnerApplications PartnerApplication[] @relation("PartnerApplicationReviewer")
   createdAt                   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                   DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  @@index([status], map: "users_status_idx")
   @@map("users")
 }
 
 model UserProfile {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String   @unique(map: "user_profiles_user_id_key") @map("user_id") @db.Uuid
-  cpfNormalized String?  @unique(map: "user_profiles_cpf_normalized_key") @map("cpf_normalized") @db.VarChar(11)
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                 String    @id @default(uuid()) @db.Uuid
+  userId             String    @unique(map: "user_profiles_user_id_key") @map("user_id") @db.Uuid
+  fullName           String?   @map("full_name") @db.VarChar(160)
+  cpfNormalized      String?   @unique(map: "user_profiles_cpf_normalized_key") @map("cpf_normalized") @db.VarChar(11)
+  phoneNormalized    String?   @map("phone_normalized") @db.VarChar(11)
+  profileCompletedAt DateTime? @map("profile_completed_at") @db.Timestamptz(3)
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("user_profiles")
+}
+
+model Vehicle {
+  id              String        @id @default(uuid()) @db.Uuid
+  userId          String        @map("user_id") @db.Uuid
+  plateNormalized String        @unique(map: "vehicles_plate_normalized_key") @map("plate_normalized") @db.VarChar(7)
+  type            VehicleType
+  brand           String        @db.VarChar(80)
+  model           String        @db.VarChar(80)
+  color           String        @db.VarChar(50)
+  year            Int?
+  nickname        String?       @db.VarChar(60)
+  status          VehicleStatus @default(ACTIVE)
+  isPrimary       Boolean       @default(false) @map("is_primary")
+  user            User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([status], map: "vehicles_status_idx")
+  @@index([type], map: "vehicles_type_idx")
+  @@index([userId, status], map: "vehicles_user_id_status_idx")
+  @@map("vehicles")
 }
 
 model UserRole {

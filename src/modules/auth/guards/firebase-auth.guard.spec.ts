@@ -1,7 +1,7 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import { Role } from '../../../generated/prisma/enums';
+import { Role, UserStatus } from '../../../generated/prisma/enums';
 import { FirebaseAuthAdapter } from '../adapters/firebase-auth.adapter';
 import { FirebaseTokenVerificationError } from '../errors/firebase-token-verification.error';
 import { UsersService } from '../services/users.service';
@@ -36,6 +36,7 @@ describe('FirebaseAuthGuard', () => {
     id: 'bbf3a09e-c57d-4c6c-81cc-4a58bb738c05',
     profile: {},
     roles: [Role.CUSTOMER],
+    status: UserStatus.ACTIVE,
   };
 
   beforeEach(() => {
@@ -107,6 +108,30 @@ describe('FirebaseAuthGuard', () => {
     expect(findOrCreateCustomer).toHaveBeenCalledWith({
       email: 'cliente@vekko.test',
       firebaseUid: 'firebase-customer',
+    });
+  });
+
+  it('blocks a local account even when Firebase accepts the token', async () => {
+    firebaseAuthAdapter.verifyIdToken.mockResolvedValue({
+      email: 'cliente@vekko.test',
+      firebaseUid: 'firebase-customer',
+    });
+    usersService.findOrCreateCustomer.mockResolvedValue({
+      ...authenticatedUser,
+      status: UserStatus.BLOCKED,
+    });
+    const request = {
+      headers: {
+        authorization: 'Bearer valid-token',
+      },
+    } as Request;
+
+    await expect(
+      guard.canActivate(createContext(request)),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'ACCOUNT_BLOCKED',
+      },
     });
   });
 });

@@ -8,6 +8,7 @@ import {
 import type { Request, Response } from 'express';
 
 type ErrorPayload = {
+  code?: string;
   error?: string;
   message?: string | string[];
 };
@@ -34,6 +35,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       : undefined;
 
     response.status(statusCode).json({
+      ...(payload?.code ? { code: payload.code } : {}),
       error:
         payload?.error ??
         (statusCode === 500 ? 'Internal Server Error' : 'Request Error'),

@@ -9,8 +9,9 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/database/prisma.service';
-import { Role } from '../src/generated/prisma/enums';
+import { Role, UserStatus } from '../src/generated/prisma/enums';
 import { FirebaseAuthAdapter } from '../src/modules/auth/adapters/firebase-auth.adapter';
 import { Roles } from '../src/modules/auth/decorators/roles.decorator';
 import { FirebaseTokenVerificationError } from '../src/modules/auth/errors/firebase-token-verification.error';
@@ -34,7 +35,9 @@ describe('Infrastructure health (e2e)', () => {
   let app: INestApplication<App>;
   let prismaService: PrismaService;
   const authenticatedFirebaseUid = `e2e-auth-${randomUUID()}`;
+  const otherFirebaseUid = `e2e-auth-${randomUUID()}`;
   const partnerApplicationCnpj = '11222333000181';
+  let primaryVehicleId = '';
   const firebaseAuthAdapter = {
     getUserIdentity: jest.fn(),
     verifyIdToken: jest.fn(
@@ -44,6 +47,13 @@ describe('Infrastructure health (e2e)', () => {
         email: string;
         firebaseUid: string;
       }> => {
+        if (token === 'other-token') {
+          return Promise.resolve({
+            email: 'other.customer.e2e@vekko.test',
+            firebaseUid: otherFirebaseUid,
+          });
+        }
+
         if (token !== 'valid-token') {
           return Promise.reject(new FirebaseTokenVerificationError());
         }
@@ -74,6 +84,7 @@ describe('Infrastructure health (e2e)', () => {
         whitelist: true,
       }),
     );
+    app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
     prismaService = app.get(PrismaService);
     await prismaService.partnerApplication.deleteMany({
@@ -154,6 +165,190 @@ describe('Infrastructure health (e2e)', () => {
       .set('Authorization', 'Bearer valid-token')
       .expect(200)
       .expect({ allowed: true });
+  });
+
+  it('completes the customer profile and keeps CPF immutable', async () => {
+    await request(app.getHttpServer())
+      .patch('/api/v1/profile')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        cpf: '529.982.247-25',
+        fullName: 'Cliente E2E',
+        phone: '(34) 99999-8888',
+      })
+      .expect(200)
+      .expect(
+        ({
+          body,
+        }: {
+          body: {
+            profile: {
+              complete: boolean;
+              cpfNormalized: string;
+              fullName: string;
+              phoneNormalized: string;
+            };
+          };
+        }) => {
+          expect(body.profile).toEqual(
+            expect.objectContaining({
+              complete: true,
+              cpfNormalized: '52998224725',
+              fullName: 'Cliente E2E',
+              phoneNormalized: '34999998888',
+            }),
+          );
+        },
+      );
+
+    await request(app.getHttpServer())
+      .patch('/api/v1/profile')
+      .set('Authorization', 'Bearer valid-token')
+      .send({ cpf: '529.982.247-25' })
+      .expect(200)
+      .expect(({ body }: { body: { profile: { cpfNormalized: string } } }) => {
+        expect(body.profile.cpfNormalized).toBe('52998224725');
+      });
+
+    await request(app.getHttpServer())
+      .patch('/api/v1/profile')
+      .set('Authorization', 'Bearer valid-token')
+      .send({ cpf: '111.444.777-35' })
+      .expect(409)
+      .expect(
+        ({
+          body,
+        }: {
+          body: { code: string; message: string; statusCode: number };
+        }) => {
+          expect(body.statusCode).toBe(409);
+          expect(body.code).toBe('CPF_IMMUTABLE');
+          expect(body.message).toBe(
+            'O CPF não pode ser alterado após o primeiro cadastro.',
+          );
+        },
+      );
+  });
+
+  it('creates, normalizes and protects customer vehicles', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/vehicles')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        brand: 'Toyota',
+        color: 'Prata',
+        model: 'Corolla',
+        plate: 'abc-1d23',
+        type: 'SEDAN',
+      })
+      .expect(201)
+      .expect(
+        ({
+          body,
+        }: {
+          body: {
+            id: string;
+            isPrimary: boolean;
+            plateNormalized: string;
+            year: number | null;
+            nickname: string | null;
+          };
+        }) => {
+          primaryVehicleId = body.id;
+          expect(body.isPrimary).toBe(true);
+          expect(body.plateNormalized).toBe('ABC1D23');
+          expect(body.year).toBeNull();
+          expect(body.nickname).toBeNull();
+        },
+      );
+
+    await request(app.getHttpServer())
+      .post('/api/v1/vehicles')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        brand: 'Toyota',
+        color: 'Prata',
+        model: 'Corolla',
+        plate: 'ABC 1D23',
+        type: 'SEDAN',
+      })
+      .expect(409)
+      .expect(({ body }: { body: { code: string } }) => {
+        expect(body.code).toBe('VEHICLE_PLATE_ALREADY_IN_USE');
+      });
+  });
+
+  it('enforces the five active vehicles per CPF limit', async () => {
+    const additionalPlates = ['DEF1234', 'GHI2J34', 'JKL3456', 'MNO4P56'];
+
+    for (const plate of additionalPlates) {
+      await request(app.getHttpServer())
+        .post('/api/v1/vehicles')
+        .set('Authorization', 'Bearer valid-token')
+        .send({
+          brand: 'Marca E2E',
+          color: 'Preto',
+          model: 'Modelo E2E',
+          plate,
+          type: 'HATCH',
+        })
+        .expect(201);
+    }
+
+    await request(app.getHttpServer())
+      .post('/api/v1/vehicles')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        brand: 'Marca E2E',
+        color: 'Branco',
+        model: 'Sexto veículo',
+        plate: 'PQR5678',
+        type: 'SUV',
+      })
+      .expect(409)
+      .expect(({ body }: { body: { code: string } }) => {
+        expect(body.code).toBe('VEHICLE_LIMIT_REACHED');
+      });
+  });
+
+  it('does not expose a vehicle to another customer', async () => {
+    await request(app.getHttpServer())
+      .patch('/api/v1/profile')
+      .set('Authorization', 'Bearer other-token')
+      .send({
+        cpf: '111.444.777-35',
+        fullName: 'Outro Cliente E2E',
+        phone: '(34) 98888-7777',
+      })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/vehicles/${primaryVehicleId}`)
+      .set('Authorization', 'Bearer other-token')
+      .expect(404)
+      .expect(({ body }: { body: { code: string } }) => {
+        expect(body.code).toBe('VEHICLE_NOT_FOUND');
+      });
+  });
+
+  it('blocks API access even while the Firebase token is still valid', async () => {
+    await prismaService.user.update({
+      data: { status: UserStatus.BLOCKED },
+      where: { firebaseUid: authenticatedFirebaseUid },
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .set('Authorization', 'Bearer valid-token')
+      .expect(403)
+      .expect(({ body }: { body: { code: string } }) => {
+        expect(body.code).toBe('ACCOUNT_BLOCKED');
+      });
+
+    await prismaService.user.update({
+      data: { status: UserStatus.ACTIVE },
+      where: { firebaseUid: authenticatedFirebaseUid },
+    });
   });
 
   it('returns 403 when the PostgreSQL role is incorrect', async () => {
@@ -250,9 +445,16 @@ describe('Infrastructure health (e2e)', () => {
       await prismaService.partnerApplication.deleteMany({
         where: { cnpjNormalized: partnerApplicationCnpj },
       });
+      await prismaService.vehicle.deleteMany({
+        where: {
+          user: {
+            firebaseUid: { in: [authenticatedFirebaseUid, otherFirebaseUid] },
+          },
+        },
+      });
       await prismaService.user.deleteMany({
         where: {
-          firebaseUid: authenticatedFirebaseUid,
+          firebaseUid: { in: [authenticatedFirebaseUid, otherFirebaseUid] },
         },
       });
     }

@@ -1,11 +1,13 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
+import { UserStatus } from '../../../generated/prisma/enums';
 import { FirebaseAuthAdapter } from '../adapters/firebase-auth.adapter';
 import { IS_PUBLIC_KEY } from '../auth.constants';
 import { FirebaseTokenVerificationError } from '../errors/firebase-token-verification.error';
@@ -35,6 +37,14 @@ export class FirebaseAuthGuard implements CanActivate {
     try {
       const identity = await this.firebaseAuthAdapter.verifyIdToken(idToken);
       request.user = await this.usersService.findOrCreateCustomer(identity);
+
+      if (request.user.status === UserStatus.BLOCKED) {
+        throw new ForbiddenException({
+          code: 'ACCOUNT_BLOCKED',
+          error: 'Forbidden',
+          message: 'Esta conta está bloqueada. Entre em contato com o suporte.',
+        });
+      }
     } catch (error) {
       if (error instanceof FirebaseTokenVerificationError) {
         throw new UnauthorizedException('Authentication is required.');
