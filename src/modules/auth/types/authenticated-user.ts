@@ -1,4 +1,4 @@
-import type { Role } from '../../../generated/prisma/enums';
+import type { Role, UserStatus } from '../../../generated/prisma/enums';
 
 export type FirebaseIdentity = {
   email?: string;
@@ -7,6 +7,9 @@ export type FirebaseIdentity = {
 
 export type AuthenticatedUserProfile = {
   cpfNormalized?: string;
+  fullName?: string;
+  phoneNormalized?: string;
+  profileCompletedAt?: Date;
 };
 
 export type AuthenticatedUser = {
@@ -15,4 +18,5 @@ export type AuthenticatedUser = {
   id: string;
   profile: AuthenticatedUserProfile;
   roles: Role[];
+  status: UserStatus;
 };
