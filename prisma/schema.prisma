@@ -39,6 +39,23 @@ enum VehicleStatus {
   INACTIVE
 }
 
+enum PlanCode {
+  BASIC
+  ESSENTIAL
+  PREMIUM
+  UNLIMITED
+}
+
+enum PlanStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PlanBenefitMode {
+  LIMITED
+  UNLIMITED
+}
+
 enum PartnerApplicationStatus {
   PENDING_REVIEW
   APPROVED
@@ -107,6 +124,48 @@ model Vehicle {
   @@index([type], map: "vehicles_type_idx")
   @@index([userId, status], map: "vehicles_user_id_status_idx")
   @@map("vehicles")
+}
+
+model Plan {
+  id                   String                   @id @default(uuid()) @db.Uuid
+  code                 PlanCode                 @unique(map: "plans_code_key")
+  name                 String                   @db.VarChar(80)
+  description          String                   @db.VarChar(500)
+  monthlyPriceCents    Int                      @map("monthly_price_cents")
+  status               PlanStatus               @default(ACTIVE)
+  displayOrder         Int                      @map("display_order")
+  benefit              PlanBenefit?
+  vehicleEligibilities PlanVehicleEligibility[]
+  createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([status, displayOrder], map: "plans_status_display_order_idx")
+  @@map("plans")
+}
+
+model PlanBenefit {
+  planId         String          @id @map("plan_id") @db.Uuid
+  mode           PlanBenefitMode
+  washesPerCycle Int?            @map("washes_per_cycle")
+  maxUsesPerDay  Int?            @map("max_uses_per_day")
+  plan           Plan            @relation(fields: [planId], references: [id], onDelete: Restrict)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("plan_benefits")
+}
+
+model PlanVehicleEligibility {
+  planId      String      @map("plan_id") @db.Uuid
+  vehicleType VehicleType @map("vehicle_type")
+  allowed     Boolean     @default(true)
+  plan        Plan        @relation(fields: [planId], references: [id], onDelete: Restrict)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@id([planId, vehicleType])
+  @@index([vehicleType, allowed], map: "plan_vehicle_eligibilities_type_allowed_idx")
+  @@map("plan_vehicle_eligibilities")
 }
 
 model UserRole {
