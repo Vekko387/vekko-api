@@ -141,6 +141,34 @@ export class PartnerApprovalService {
           },
         });
 
+        await transaction.partnerUnit.upsert({
+          create: {
+            addressComplement: application.addressComplement,
+            addressNumber: application.addressNumber,
+            city: application.city,
+            formattedAddress: [
+              `${application.street}, ${application.addressNumber}`,
+              application.addressComplement,
+              application.neighborhood,
+              `${application.city} - ${application.state}`,
+              application.postalCodeNormalized,
+            ]
+              .filter(Boolean)
+              .join(', '),
+            id: partner.id,
+            name: 'Unidade principal',
+            neighborhood: application.neighborhood,
+            partnerId: partner.id,
+            phoneNormalized: application.contactPhone,
+            postalCodeNormalized: application.postalCodeNormalized,
+            state: application.state,
+            street: application.street,
+            whatsappNormalized: application.whatsappNormalized,
+          },
+          update: {},
+          where: { id: partner.id },
+        });
+
         if (
           currentApplication.status === PartnerApplicationStatus.PENDING_REVIEW
         ) {

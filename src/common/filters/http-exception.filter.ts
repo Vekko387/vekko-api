@@ -11,6 +11,7 @@ type ErrorPayload = {
   code?: string;
   error?: string;
   message?: string | string[];
+  missingRequirements?: string[];
 };
 
 function isErrorPayload(value: unknown): value is ErrorPayload {
@@ -44,6 +45,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         (typeof exceptionResponse === 'string'
           ? exceptionResponse
           : 'Não foi possível processar a solicitação.'),
+      ...(Array.isArray(payload?.missingRequirements)
+        ? { missingRequirements: payload.missingRequirements }
+        : {}),
       path: request.originalUrl,
       statusCode,
       timestamp: new Date().toISOString(),

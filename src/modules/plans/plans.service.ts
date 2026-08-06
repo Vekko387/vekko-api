@@ -9,6 +9,7 @@ import {
   PlanBenefitMode,
   PlanCode,
   PlanStatus,
+  PartnerUnitStatus,
   VehicleStatus,
   VehicleType,
 } from '../../generated/prisma/enums';
@@ -154,6 +155,18 @@ export class PlansService {
       data: { status: input.status },
       where: { id: planId },
     });
+
+    if (input.status === PlanStatus.INACTIVE) {
+      await this.prismaService.partnerUnit.updateMany({
+        data: { status: PartnerUnitStatus.DRAFT },
+        where: {
+          acceptedPlans: {
+            none: { plan: { status: PlanStatus.ACTIVE } },
+          },
+          status: PartnerUnitStatus.ACTIVE,
+        },
+      });
+    }
 
     return this.findAdmin(planId);
   }

@@ -65,6 +65,9 @@ function createFixture(emailDeliverySucceeds: boolean) {
     partnerMember: {
       upsert: partnerMemberUpsert,
     },
+    partnerUnit: {
+      upsert: jest.fn().mockResolvedValue({ id: 'partner-id' }),
+    },
     user: {
       upsert: jest.fn().mockResolvedValue({ id: 'user-id' }),
     },
@@ -119,6 +122,7 @@ function createFixture(emailDeliverySucceeds: boolean) {
     applicationReviewUpdate,
     createFirebaseUser,
     partnerMemberUpsert,
+    partnerUnitUpsert: transaction.partnerUnit.upsert,
     sendPasswordResetEmail,
     service,
     transaction,
@@ -158,6 +162,19 @@ describe('PartnerApprovalService', () => {
     expect(fixture.sendPasswordResetEmail).toHaveBeenCalledWith(
       pendingApplication.contactEmail,
     );
+    const partnerUnitCalls: unknown = fixture.partnerUnitUpsert.mock.calls;
+    expect(partnerUnitCalls).toMatchObject([
+      [
+        {
+          create: {
+            id: 'partner-id',
+            name: 'Unidade principal',
+            partnerId: 'partner-id',
+          },
+          where: { id: 'partner-id' },
+        },
+      ],
+    ]);
   });
 
   it('keeps the approval valid when Firebase email delivery is temporarily unavailable', async () => {

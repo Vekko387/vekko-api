@@ -33,6 +33,10 @@ export default () => ({
       process.env.DEPENDENCY_HEALTH_TIMEOUT_MS ?? 2_000,
     ),
   },
+  location: {
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
+    timeoutMs: Number(process.env.GOOGLE_MAPS_GEOCODING_TIMEOUT_MS ?? 5_000),
+  },
   redis: {
     connectTimeoutMs: Number(process.env.REDIS_CONNECT_TIMEOUT_MS ?? 5_000),
     keyPrefix: process.env.REDIS_KEY_PREFIX ?? 'vekko:development',
