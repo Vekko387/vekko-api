@@ -37,11 +37,17 @@ export function toPartnerApplicationResponse(
     postalCode: application.postalCodeNormalized,
     rejectionReason: application.rejectionReason ?? undefined,
     responsibleName: application.responsibleName,
+    responsibleCpf: application.responsibleCpfNormalized,
+    responsibleEmail: application.responsibleEmail,
+    responsiblePhone: application.responsiblePhone,
+    responsibleRole: application.responsibleRole,
     reviewedAt: application.reviewedAt ?? undefined,
     reviewedById: application.reviewedById ?? undefined,
     serviceDescription: application.serviceDescription,
     state: application.state,
     street: application.street,
     tradeName: application.tradeName,
+    websiteOrInstagram: application.websiteOrInstagram,
+    whatsapp: application.whatsappNormalized,
   };
 }

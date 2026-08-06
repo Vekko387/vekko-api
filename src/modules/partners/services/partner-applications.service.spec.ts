@@ -20,6 +20,10 @@ const application = {
   postalCodeNormalized: '60160120',
   rejectionReason: null,
   responsibleName: 'Maria da Silva',
+  responsibleCpfNormalized: '52998224725',
+  responsibleEmail: 'maria@example.com',
+  responsiblePhone: '85988888888',
+  responsibleRole: 'Proprietária',
   reviewedAt: null,
   reviewedById: null,
   serviceDescription: 'Serviços automotivos completos.',
@@ -29,6 +33,8 @@ const application = {
   submittedAt,
   termsAcceptedAt: submittedAt,
   tradeName: 'Auto Center Exemplo',
+  websiteOrInstagram: 'https://instagram.com/autocenter',
+  whatsappNormalized: '85999999999',
 };
 
 const input: CreatePartnerApplicationDto = {
@@ -42,11 +48,17 @@ const input: CreatePartnerApplicationDto = {
   neighborhood: 'Aldeota',
   postalCode: '60.160-120',
   responsibleName: 'Maria da Silva',
+  responsibleCpf: '529.982.247-25',
+  responsibleEmail: 'maria@example.com',
+  responsiblePhone: '(85) 98888-8888',
+  responsibleRole: 'Proprietária',
   serviceDescription: 'Serviços automotivos completos.',
   state: 'ce',
   street: 'Avenida Exemplo',
   termsAccepted: true,
   tradeName: 'Auto Center Exemplo',
+  websiteOrInstagram: 'https://instagram.com/autocenter',
+  whatsapp: '(85) 99999-9999',
 };
 
 describe('PartnerApplicationsService', () => {

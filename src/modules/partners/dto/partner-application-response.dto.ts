@@ -28,11 +28,29 @@ export class PartnerApplicationResponseDto extends PartnerApplicationSubmissionR
   @ApiProperty()
   responsibleName: string;
 
+  @ApiPropertyOptional({ nullable: true, type: String })
+  responsibleCpf: string | null;
+
+  @ApiProperty()
+  responsiblePhone: string;
+
+  @ApiProperty()
+  responsibleEmail: string;
+
+  @ApiProperty()
+  responsibleRole: string;
+
   @ApiProperty()
   contactEmail: string;
 
   @ApiProperty()
   contactPhone: string;
+
+  @ApiProperty()
+  whatsapp: string;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  websiteOrInstagram: string | null;
 
   @ApiProperty()
   postalCode: string;

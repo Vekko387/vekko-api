@@ -6,15 +6,21 @@ import {
   FirebasePasswordResetEmailHttpClient,
 } from './adapters/firebase-password-reset-email.client';
 import { PartnerApplicationsController } from './partner-applications.controller';
+import { PartnersController } from './partners.controller';
+import { AdminPartnersController } from './admin-partners.controller';
 import { PartnerApplicationsService } from './services/partner-applications.service';
 import { PartnerApprovalService } from './services/partner-approval.service';
+import { PartnerDetailsService } from './services/partner-details.service';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   controllers: [
     PartnerApplicationsController,
     AdminPartnerApplicationsController,
+    PartnersController,
+    AdminPartnersController,
   ],
-  imports: [AuthModule],
+  imports: [AuthModule, StorageModule],
   providers: [
     FirebasePasswordResetEmailHttpClient,
     {
@@ -23,6 +29,7 @@ import { PartnerApprovalService } from './services/partner-approval.service';
     },
     PartnerApplicationsService,
     PartnerApprovalService,
+    PartnerDetailsService,
   ],
 })
 export class PartnersModule {}

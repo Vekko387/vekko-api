@@ -23,6 +23,46 @@ export const envValidationSchema = Joi.object({
   REDIS_URL: Joi.string()
     .uri({ scheme: ['redis', 'rediss'] })
     .required(),
+  R2_ACCESS_KEY_ID: Joi.string()
+    .trim()
+    .min(1)
+    .when('NODE_ENV', {
+      is: Joi.valid('staging', 'production'),
+      then: Joi.required(),
+    }),
+  R2_BUCKET: Joi.string()
+    .trim()
+    .min(1)
+    .when('NODE_ENV', {
+      is: Joi.valid('staging', 'production'),
+      then: Joi.required(),
+    }),
+  R2_ENDPOINT: Joi.string()
+    .uri({ scheme: ['https'] })
+    .when('NODE_ENV', {
+      is: Joi.valid('staging', 'production'),
+      then: Joi.required(),
+    }),
+  R2_PREFIX: Joi.string()
+    .trim()
+    .min(1)
+    .when('NODE_ENV', {
+      is: Joi.valid('staging', 'production'),
+      then: Joi.required(),
+    }),
+  R2_PUBLIC_BASE_URL: Joi.string()
+    .uri({ scheme: ['https'] })
+    .when('NODE_ENV', {
+      is: Joi.valid('staging', 'production'),
+      then: Joi.required(),
+    }),
+  R2_REGION: Joi.string().trim().min(1).default('auto'),
+  R2_SECRET_ACCESS_KEY: Joi.string()
+    .min(1)
+    .when('NODE_ENV', {
+      is: Joi.valid('staging', 'production'),
+      then: Joi.required(),
+    }),
   THROTTLE_LIMIT: Joi.number().integer().positive().default(100),
   THROTTLE_TTL_MS: Joi.number().integer().positive().default(60_000),
 });

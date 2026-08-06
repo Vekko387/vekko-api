@@ -25,6 +25,10 @@ const pendingApplication = {
   postalCodeNormalized: '60160120',
   rejectionReason: null,
   responsibleName: 'Maria da Silva',
+  responsibleCpfNormalized: '52998224725',
+  responsibleEmail: 'maria@example.com',
+  responsiblePhone: '85988888888',
+  responsibleRole: 'Proprietária',
   reviewedAt: null,
   reviewedById: null,
   serviceDescription: 'Serviços automotivos completos.',
@@ -34,6 +38,8 @@ const pendingApplication = {
   submittedAt: new Date('2026-07-31T15:00:00.000Z'),
   termsAcceptedAt: new Date('2026-07-31T15:00:00.000Z'),
   tradeName: 'Auto Center Exemplo',
+  websiteOrInstagram: 'https://instagram.com/autocenter',
+  whatsappNormalized: '85999999999',
 };
 const approvedApplication = {
   ...pendingApplication,

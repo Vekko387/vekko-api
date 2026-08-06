@@ -14,6 +14,9 @@ import { PrismaService } from '../src/database/prisma.service';
 import {
   PlanCode,
   PlanStatus,
+  PartnerApplicationStatus,
+  PartnerMemberRole,
+  PartnerStatus,
   Role,
   UserStatus,
   VehicleType,
@@ -43,6 +46,7 @@ describe('Infrastructure health (e2e)', () => {
   const authenticatedFirebaseUid = `e2e-auth-${randomUUID()}`;
   const otherFirebaseUid = `e2e-auth-${randomUUID()}`;
   const adminFirebaseUid = `e2e-admin-${randomUUID()}`;
+  const partnerFirebaseUid = `e2e-partner-${randomUUID()}`;
   const partnerApplicationCnpj = '11222333000181';
   let primaryVehicleId = '';
   let hatchVehicleId = '';
@@ -68,6 +72,13 @@ describe('Infrastructure health (e2e)', () => {
           return Promise.resolve({
             email: 'admin.e2e@vekko.test',
             firebaseUid: adminFirebaseUid,
+          });
+        }
+
+        if (token === 'partner-token') {
+          return Promise.resolve({
+            email: 'partner.structure.e2e@vekko.test',
+            firebaseUid: partnerFirebaseUid,
           });
         }
 
@@ -623,11 +634,16 @@ describe('Infrastructure health (e2e)', () => {
         neighborhood: 'Aldeota',
         postalCode: '60160120',
         responsibleName: 'Parceiro E2E',
+        responsibleCpf: '52998224725',
+        responsibleEmail: 'responsavel.e2e@vekko.test',
+        responsiblePhone: '85988888888',
+        responsibleRole: 'Proprietário',
         serviceDescription: 'Serviços automotivos para o teste E2E.',
         state: 'CE',
         street: 'Avenida Exemplo',
         termsAccepted: true,
         tradeName: 'Auto Center E2E',
+        whatsapp: '85999999999',
       })
       .expect(201)
       .expect(
@@ -658,6 +674,161 @@ describe('Infrastructure health (e2e)', () => {
       .get('/api/v1/admin/partner-applications')
       .set('Authorization', 'Bearer valid-token')
       .expect(403);
+  });
+
+  it('protects ownership, CNPJ immutability and partner suspension', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .set('Authorization', 'Bearer partner-token')
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+
+    const partnerUser = await prismaService.user.findUniqueOrThrow({
+      where: { firebaseUid: partnerFirebaseUid },
+    });
+    const adminUser = await prismaService.user.findUniqueOrThrow({
+      where: { firebaseUid: adminFirebaseUid },
+    });
+    await prismaService.userRole.upsert({
+      create: { role: Role.PARTNER_OWNER, userId: partnerUser.id },
+      update: {},
+      where: {
+        userId_role: { role: Role.PARTNER_OWNER, userId: partnerUser.id },
+      },
+    });
+    await prismaService.userRole.upsert({
+      create: { role: Role.ADMIN, userId: adminUser.id },
+      update: {},
+      where: { userId_role: { role: Role.ADMIN, userId: adminUser.id } },
+    });
+
+    const application = await prismaService.partnerApplication.create({
+      data: {
+        addressNumber: '500',
+        businessCategory: 'Centro automotivo',
+        city: 'Uberlândia',
+        cnpjNormalized: '19131243000197',
+        contactEmail: 'contato.structure.e2e@vekko.test',
+        contactPhone: '34999999999',
+        legalName: 'Parceiro Structure E2E LTDA',
+        neighborhood: 'Centro',
+        postalCodeNormalized: '38400000',
+        responsibleCpfNormalized: '52998224725',
+        responsibleEmail: 'partner.structure.e2e@vekko.test',
+        responsibleName: 'Parceiro Structure E2E',
+        responsiblePhone: '34988888888',
+        responsibleRole: 'Proprietário',
+        reviewedAt: new Date(),
+        reviewedById: adminUser.id,
+        serviceDescription: 'Estabelecimento usado no teste integrado.',
+        state: 'MG',
+        status: PartnerApplicationStatus.APPROVED,
+        street: 'Avenida Afonso Pena',
+        termsAcceptedAt: new Date(),
+        tradeName: 'Auto Structure E2E',
+        whatsappNormalized: '34999999999',
+      },
+    });
+    const partner = await prismaService.partner.create({
+      data: {
+        addressNumber: application.addressNumber,
+        applicationId: application.id,
+        businessCategory: application.businessCategory,
+        city: application.city,
+        cnpjNormalized: application.cnpjNormalized,
+        contactEmail: application.contactEmail,
+        contactPhone: application.contactPhone,
+        legalName: application.legalName,
+        neighborhood: application.neighborhood,
+        postalCodeNormalized: application.postalCodeNormalized,
+        responsibleCpfNormalized: application.responsibleCpfNormalized,
+        responsibleEmail: application.responsibleEmail,
+        responsibleName: application.responsibleName,
+        responsiblePhone: application.responsiblePhone,
+        responsibleRole: application.responsibleRole,
+        serviceDescription: application.serviceDescription,
+        state: application.state,
+        street: application.street,
+        tradeName: application.tradeName,
+        whatsappNormalized: application.whatsappNormalized,
+      },
+    });
+    await prismaService.partnerMember.create({
+      data: {
+        partnerId: partner.id,
+        role: PartnerMemberRole.OWNER,
+        userId: partnerUser.id,
+      },
+    });
+
+    try {
+      await request(app.getHttpServer())
+        .get('/api/v1/partners/me')
+        .set('Authorization', 'Bearer valid-token')
+        .expect(403);
+      await request(app.getHttpServer())
+        .get('/api/v1/partners/me')
+        .set('Authorization', 'Bearer partner-token')
+        .expect(200)
+        .expect(({ body }: { body: { id: string; status: PartnerStatus } }) => {
+          expect(body.id).toBe(partner.id);
+          expect(body.status).toBe(PartnerStatus.ACTIVE);
+        });
+      await request(app.getHttpServer())
+        .get('/api/v1/admin/partners')
+        .set('Authorization', 'Bearer partner-token')
+        .expect(403);
+      await request(app.getHttpServer())
+        .patch('/api/v1/partners/me')
+        .set('Authorization', 'Bearer partner-token')
+        .send({ cnpj: '11222333000181' })
+        .expect(400);
+      await request(app.getHttpServer())
+        .patch('/api/v1/partners/me')
+        .set('Authorization', 'Bearer partner-token')
+        .send({ tradeName: 'Auto Structure Atualizado' })
+        .expect(200)
+        .expect(({ body }: { body: { tradeName: string } }) => {
+          expect(body.tradeName).toBe('Auto Structure Atualizado');
+        });
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/partners/${partner.id}/status`)
+        .set('Authorization', 'Bearer admin-token')
+        .send({ status: PartnerStatus.SUSPENDED })
+        .expect(200);
+      await request(app.getHttpServer())
+        .patch('/api/v1/partners/me')
+        .set('Authorization', 'Bearer partner-token')
+        .send({ tradeName: 'Alteração proibida' })
+        .expect(403)
+        .expect(({ body }: { body: { code: string } }) => {
+          expect(body.code).toBe('PARTNER_SUSPENDED');
+        });
+      await request(app.getHttpServer())
+        .get('/api/v1/partners/me')
+        .set('Authorization', 'Bearer partner-token')
+        .expect(200)
+        .expect(({ body }: { body: { status: PartnerStatus } }) => {
+          expect(body.status).toBe(PartnerStatus.SUSPENDED);
+        });
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/partners/${partner.id}/status`)
+        .set('Authorization', 'Bearer admin-token')
+        .send({ status: PartnerStatus.ACTIVE })
+        .expect(200)
+        .expect(({ body }: { body: { status: PartnerStatus } }) => {
+          expect(body.status).toBe(PartnerStatus.ACTIVE);
+        });
+    } finally {
+      await prismaService.partner.delete({ where: { id: partner.id } });
+      await prismaService.partnerApplication.delete({
+        where: { id: application.id },
+      });
+      await prismaService.user.delete({ where: { id: partnerUser.id } });
+    }
   });
 
   it('persists the minimum authentication foundation', async () => {
