@@ -11,7 +11,13 @@ import type { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaService } from '../src/database/prisma.service';
-import { Role, UserStatus } from '../src/generated/prisma/enums';
+import {
+  PlanCode,
+  PlanStatus,
+  Role,
+  UserStatus,
+  VehicleType,
+} from '../src/generated/prisma/enums';
 import { FirebaseAuthAdapter } from '../src/modules/auth/adapters/firebase-auth.adapter';
 import { Roles } from '../src/modules/auth/decorators/roles.decorator';
 import { FirebaseTokenVerificationError } from '../src/modules/auth/errors/firebase-token-verification.error';
@@ -36,8 +42,12 @@ describe('Infrastructure health (e2e)', () => {
   let prismaService: PrismaService;
   const authenticatedFirebaseUid = `e2e-auth-${randomUUID()}`;
   const otherFirebaseUid = `e2e-auth-${randomUUID()}`;
+  const adminFirebaseUid = `e2e-admin-${randomUUID()}`;
   const partnerApplicationCnpj = '11222333000181';
   let primaryVehicleId = '';
+  let hatchVehicleId = '';
+  let suvVehicleId = '';
+  let pickupVehicleId = '';
   const firebaseAuthAdapter = {
     getUserIdentity: jest.fn(),
     verifyIdToken: jest.fn(
@@ -51,6 +61,13 @@ describe('Infrastructure health (e2e)', () => {
           return Promise.resolve({
             email: 'other.customer.e2e@vekko.test',
             firebaseUid: otherFirebaseUid,
+          });
+        }
+
+        if (token === 'admin-token') {
+          return Promise.resolve({
+            email: 'admin.e2e@vekko.test',
+            firebaseUid: adminFirebaseUid,
           });
         }
 
@@ -279,9 +296,14 @@ describe('Infrastructure health (e2e)', () => {
   });
 
   it('enforces the five active vehicles per CPF limit', async () => {
-    const additionalPlates = ['DEF1234', 'GHI2J34', 'JKL3456', 'MNO4P56'];
+    const additionalVehicles = [
+      { plate: 'DEF1234', type: VehicleType.HATCH },
+      { plate: 'GHI2J34', type: VehicleType.SUV },
+      { plate: 'JKL3456', type: VehicleType.PICKUP },
+      { plate: 'MNO4P56', type: VehicleType.HATCH },
+    ];
 
-    for (const plate of additionalPlates) {
+    for (const { plate, type } of additionalVehicles) {
       await request(app.getHttpServer())
         .post('/api/v1/vehicles')
         .set('Authorization', 'Bearer valid-token')
@@ -290,9 +312,17 @@ describe('Infrastructure health (e2e)', () => {
           color: 'Preto',
           model: 'Modelo E2E',
           plate,
-          type: 'HATCH',
+          type,
         })
-        .expect(201);
+        .expect(201)
+        .expect(({ body }: { body: { id: string } }) => {
+          if (type === VehicleType.HATCH && !hatchVehicleId) {
+            hatchVehicleId = body.id;
+          }
+
+          if (type === VehicleType.SUV) suvVehicleId = body.id;
+          if (type === VehicleType.PICKUP) pickupVehicleId = body.id;
+        });
     }
 
     await request(app.getHttpServer())
@@ -329,6 +359,227 @@ describe('Infrastructure health (e2e)', () => {
       .expect(({ body }: { body: { code: string } }) => {
         expect(body.code).toBe('VEHICLE_NOT_FOUND');
       });
+  });
+
+  it.each([
+    ['Hatch', () => hatchVehicleId],
+    ['Sedan', () => primaryVehicleId],
+  ])(
+    'shows all four plans as eligible for %s',
+    async (_label, getVehicleId) => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/plans?vehicleId=${getVehicleId()}`)
+        .set('Authorization', 'Bearer valid-token')
+        .expect(200)
+        .expect(
+          ({
+            body,
+          }: {
+            body: {
+              items: Array<{
+                benefit: {
+                  maxUsesPerDay: number | null;
+                  mode: string;
+                  washesPerCycle: number | null;
+                };
+                code: PlanCode;
+                eligible: boolean;
+                monthlyPriceCents: number;
+              }>;
+            };
+          }) => {
+            expect(body.items).toHaveLength(4);
+            expect(body.items.every(({ eligible }) => eligible)).toBe(true);
+            expect(body.items.map(({ code }) => code)).toEqual([
+              PlanCode.BASIC,
+              PlanCode.ESSENTIAL,
+              PlanCode.PREMIUM,
+              PlanCode.UNLIMITED,
+            ]);
+
+            const unlimited = body.items.find(
+              ({ code }) => code === PlanCode.UNLIMITED,
+            );
+            expect(unlimited).toEqual(
+              expect.objectContaining({
+                benefit: {
+                  maxUsesPerDay: 1,
+                  mode: 'UNLIMITED',
+                  washesPerCycle: null,
+                },
+                monthlyPriceCents: 37990,
+              }),
+            );
+          },
+        );
+    },
+  );
+
+  it.each([
+    ['SUV', () => suvVehicleId],
+    ['Pickup', () => pickupVehicleId],
+  ])('shows Basic as unavailable for %s', async (_label, getVehicleId) => {
+    await request(app.getHttpServer())
+      .get(`/api/v1/plans?vehicleId=${getVehicleId()}`)
+      .set('Authorization', 'Bearer valid-token')
+      .expect(200)
+      .expect(
+        ({
+          body,
+        }: {
+          body: {
+            items: Array<{
+              code: PlanCode;
+              eligible: boolean;
+              ineligibilityCode: string | null;
+            }>;
+          };
+        }) => {
+          const basic = body.items.find(({ code }) => code === PlanCode.BASIC);
+          expect(basic).toEqual(
+            expect.objectContaining({
+              eligible: false,
+              ineligibilityCode: 'BASIC_NOT_AVAILABLE_FOR_VEHICLE_TYPE',
+            }),
+          );
+        },
+      );
+  });
+
+  it('does not calculate plans with a vehicle from another account', async () => {
+    await request(app.getHttpServer())
+      .get(`/api/v1/plans?vehicleId=${primaryVehicleId}`)
+      .set('Authorization', 'Bearer other-token')
+      .expect(404)
+      .expect(({ body }: { body: { code: string } }) => {
+        expect(body.code).toBe('VEHICLE_NOT_FOUND');
+      });
+  });
+
+  it('does not allow a customer to access plan administration', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/admin/plans')
+      .set('Authorization', 'Bearer valid-token')
+      .expect(403);
+  });
+
+  it('allows an admin to manage only the official plans', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+
+    const admin = await prismaService.user.findUniqueOrThrow({
+      where: { firebaseUid: adminFirebaseUid },
+    });
+    await prismaService.userRole.upsert({
+      create: { role: Role.ADMIN, userId: admin.id },
+      update: {},
+      where: { userId_role: { role: Role.ADMIN, userId: admin.id } },
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/admin/plans')
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200)
+      .expect(({ body }: { body: { items: unknown[] } }) => {
+        expect(body.items).toHaveLength(4);
+      });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/admin/plans')
+      .set('Authorization', 'Bearer admin-token')
+      .send({ name: 'Plano extra' })
+      .expect(404);
+  });
+
+  it('protects immutable plan codes and the Basic eligibility rule', async () => {
+    const basic = await prismaService.plan.findUniqueOrThrow({
+      where: { code: PlanCode.BASIC },
+    });
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/admin/plans/${basic.id}`)
+      .set('Authorization', 'Bearer admin-token')
+      .send({ code: PlanCode.ESSENTIAL })
+      .expect(409)
+      .expect(({ body }: { body: { code: string } }) => {
+        expect(body.code).toBe('PLAN_CODE_IMMUTABLE');
+      });
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/admin/plans/${basic.id}`)
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        eligibleVehicleTypes: [
+          VehicleType.HATCH,
+          VehicleType.SEDAN,
+          VehicleType.SUV,
+        ],
+      })
+      .expect(409)
+      .expect(({ body }: { body: { code: string } }) => {
+        expect(body.code).toBe('BASIC_PLAN_VEHICLE_RESTRICTION');
+      });
+  });
+
+  it('reflects admin price changes and hides inactive plans from customers', async () => {
+    const essential = await prismaService.plan.findUniqueOrThrow({
+      where: { code: PlanCode.ESSENTIAL },
+    });
+    const premium = await prismaService.plan.findUniqueOrThrow({
+      where: { code: PlanCode.PREMIUM },
+    });
+    const temporaryPrice = essential.monthlyPriceCents + 100;
+
+    try {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/plans/${essential.id}`)
+        .set('Authorization', 'Bearer admin-token')
+        .send({ monthlyPriceCents: temporaryPrice })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/plans/${premium.id}/status`)
+        .set('Authorization', 'Bearer admin-token')
+        .send({ status: PlanStatus.INACTIVE })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/plans?vehicleId=${primaryVehicleId}`)
+        .set('Authorization', 'Bearer valid-token')
+        .expect(200)
+        .expect(
+          ({
+            body,
+          }: {
+            body: {
+              items: Array<{
+                code: PlanCode;
+                monthlyPriceCents: number;
+              }>;
+            };
+          }) => {
+            expect(body.items).toHaveLength(3);
+            expect(
+              body.items.find(({ code }) => code === PlanCode.ESSENTIAL)
+                ?.monthlyPriceCents,
+            ).toBe(temporaryPrice);
+            expect(
+              body.items.some(({ code }) => code === PlanCode.PREMIUM),
+            ).toBe(false);
+          },
+        );
+    } finally {
+      await prismaService.plan.update({
+        data: { monthlyPriceCents: essential.monthlyPriceCents },
+        where: { id: essential.id },
+      });
+      await prismaService.plan.update({
+        data: { status: PlanStatus.ACTIVE },
+        where: { id: premium.id },
+      });
+    }
   });
 
   it('blocks API access even while the Firebase token is still valid', async () => {
@@ -454,7 +705,9 @@ describe('Infrastructure health (e2e)', () => {
       });
       await prismaService.user.deleteMany({
         where: {
-          firebaseUid: { in: [authenticatedFirebaseUid, otherFirebaseUid] },
+          firebaseUid: {
+            in: [authenticatedFirebaseUid, otherFirebaseUid, adminFirebaseUid],
+          },
         },
       });
     }
