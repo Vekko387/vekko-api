@@ -14,6 +14,17 @@ export const envValidationSchema = Joi.object({
   FIREBASE_PRIVATE_KEY: Joi.string().min(1).required(),
   FIREBASE_PROJECT_ID: Joi.string().trim().min(1).required(),
   FIREBASE_WEB_API_KEY: Joi.string().trim().min(1).required(),
+  GOOGLE_MAPS_API_KEY: Joi.string()
+    .trim()
+    .min(1)
+    .when('NODE_ENV', {
+      is: Joi.valid('staging', 'production'),
+      then: Joi.required(),
+    }),
+  GOOGLE_MAPS_GEOCODING_TIMEOUT_MS: Joi.number()
+    .integer()
+    .positive()
+    .default(5_000),
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'staging', 'production')
     .default('development'),

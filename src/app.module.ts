@@ -14,6 +14,7 @@ import { FirebaseAuthGuard } from './modules/auth/guards/firebase-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { HealthModule } from './modules/health/health.module';
 import { PartnersModule } from './modules/partners/partners.module';
+import { PartnerUnitsModule } from './modules/partner-units/partner-units.module';
 import { PlansModule } from './modules/plans/plans.module';
 import { UsersModule } from './modules/users/users.module';
 import { VehiclesModule } from './modules/vehicles/vehicles.module';
@@ -51,6 +52,7 @@ import { RedisModule } from './redis/redis.module';
     VehiclesModule,
     PlansModule,
     PartnersModule,
+    PartnerUnitsModule,
     HealthModule,
   ],
   providers: [

@@ -17,6 +17,7 @@ import {
   PartnerApplicationStatus,
   PartnerMemberRole,
   PartnerStatus,
+  PartnerUnitStatus,
   Role,
   UserStatus,
   VehicleType,
@@ -47,6 +48,8 @@ describe('Infrastructure health (e2e)', () => {
   const otherFirebaseUid = `e2e-auth-${randomUUID()}`;
   const adminFirebaseUid = `e2e-admin-${randomUUID()}`;
   const partnerFirebaseUid = `e2e-partner-${randomUUID()}`;
+  const otherPartnerFirebaseUid = `e2e-partner-${randomUUID()}`;
+  const employeeFirebaseUid = `e2e-employee-${randomUUID()}`;
   const partnerApplicationCnpj = '11222333000181';
   let primaryVehicleId = '';
   let hatchVehicleId = '';
@@ -79,6 +82,20 @@ describe('Infrastructure health (e2e)', () => {
           return Promise.resolve({
             email: 'partner.structure.e2e@vekko.test',
             firebaseUid: partnerFirebaseUid,
+          });
+        }
+
+        if (token === 'other-partner-token') {
+          return Promise.resolve({
+            email: 'other.partner.e2e@vekko.test',
+            firebaseUid: otherPartnerFirebaseUid,
+          });
+        }
+
+        if (token === 'employee-token') {
+          return Promise.resolve({
+            email: 'employee.partner.e2e@vekko.test',
+            firebaseUid: employeeFirebaseUid,
           });
         }
 
@@ -763,7 +780,6 @@ describe('Infrastructure health (e2e)', () => {
         userId: partnerUser.id,
       },
     });
-
     try {
       await request(app.getHttpServer())
         .get('/api/v1/partners/me')
@@ -828,6 +844,390 @@ describe('Infrastructure health (e2e)', () => {
         where: { id: application.id },
       });
       await prismaService.user.delete({ where: { id: partnerUser.id } });
+    }
+  });
+
+  it('protects the complete partner-unit workflow and administrative control', async () => {
+    for (const token of [
+      'partner-token',
+      'other-partner-token',
+      'employee-token',
+      'admin-token',
+    ]) {
+      await request(app.getHttpServer())
+        .get('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+    }
+
+    const [ownerUser, otherOwnerUser, employeeUser, adminUser] =
+      await Promise.all([
+        prismaService.user.findUniqueOrThrow({
+          where: { firebaseUid: partnerFirebaseUid },
+        }),
+        prismaService.user.findUniqueOrThrow({
+          where: { firebaseUid: otherPartnerFirebaseUid },
+        }),
+        prismaService.user.findUniqueOrThrow({
+          where: { firebaseUid: employeeFirebaseUid },
+        }),
+        prismaService.user.findUniqueOrThrow({
+          where: { firebaseUid: adminFirebaseUid },
+        }),
+      ]);
+
+    await Promise.all([
+      prismaService.userRole.upsert({
+        create: { role: Role.PARTNER_OWNER, userId: ownerUser.id },
+        update: {},
+        where: {
+          userId_role: { role: Role.PARTNER_OWNER, userId: ownerUser.id },
+        },
+      }),
+      prismaService.userRole.upsert({
+        create: { role: Role.PARTNER_OWNER, userId: otherOwnerUser.id },
+        update: {},
+        where: {
+          userId_role: {
+            role: Role.PARTNER_OWNER,
+            userId: otherOwnerUser.id,
+          },
+        },
+      }),
+      prismaService.userRole.upsert({
+        create: { role: Role.PARTNER_EMPLOYEE, userId: employeeUser.id },
+        update: {},
+        where: {
+          userId_role: {
+            role: Role.PARTNER_EMPLOYEE,
+            userId: employeeUser.id,
+          },
+        },
+      }),
+      prismaService.userRole.upsert({
+        create: { role: Role.ADMIN, userId: adminUser.id },
+        update: {},
+        where: { userId_role: { role: Role.ADMIN, userId: adminUser.id } },
+      }),
+    ]);
+
+    const createPartnerFixture = async (
+      suffix: string,
+      cnpjNormalized: string,
+      userId: string,
+      memberRole: PartnerMemberRole,
+    ) => {
+      const application = await prismaService.partnerApplication.create({
+        data: {
+          addressNumber: '100',
+          businessCategory: 'Centro automotivo',
+          city: 'Uberlândia',
+          cnpjNormalized,
+          contactEmail: `unit.${suffix}@vekko.test`,
+          contactPhone: '34999999999',
+          legalName: `Parceiro Unit ${suffix} LTDA`,
+          neighborhood: 'Centro',
+          postalCodeNormalized: '38400000',
+          responsibleEmail: `owner.${suffix}@vekko.test`,
+          responsibleName: `Responsável ${suffix}`,
+          responsiblePhone: '34988888888',
+          responsibleRole: 'Proprietário',
+          reviewedAt: new Date(),
+          reviewedById: adminUser.id,
+          serviceDescription: 'Parceiro criado para validar unidades.',
+          state: 'MG',
+          status: PartnerApplicationStatus.APPROVED,
+          street: 'Avenida Afonso Pena',
+          termsAcceptedAt: new Date(),
+          tradeName: `Auto Unit ${suffix}`,
+          whatsappNormalized: '34999999999',
+        },
+      });
+      const partner = await prismaService.partner.create({
+        data: {
+          addressNumber: application.addressNumber,
+          applicationId: application.id,
+          businessCategory: application.businessCategory,
+          city: application.city,
+          cnpjNormalized: application.cnpjNormalized,
+          contactEmail: application.contactEmail,
+          contactPhone: application.contactPhone,
+          legalName: application.legalName,
+          neighborhood: application.neighborhood,
+          postalCodeNormalized: application.postalCodeNormalized,
+          responsibleEmail: application.responsibleEmail,
+          responsibleName: application.responsibleName,
+          responsiblePhone: application.responsiblePhone,
+          responsibleRole: application.responsibleRole,
+          serviceDescription: application.serviceDescription,
+          state: application.state,
+          street: application.street,
+          tradeName: application.tradeName,
+          whatsappNormalized: application.whatsappNormalized,
+        },
+      });
+      await prismaService.partnerMember.create({
+        data: { partnerId: partner.id, role: memberRole, userId },
+      });
+      return { application, partner };
+    };
+
+    const first = await createPartnerFixture(
+      'owner',
+      '43169565000104',
+      ownerUser.id,
+      PartnerMemberRole.OWNER,
+    );
+    const second = await createPartnerFixture(
+      'other',
+      '47875213000151',
+      otherOwnerUser.id,
+      PartnerMemberRole.OWNER,
+    );
+    await prismaService.partnerMember.create({
+      data: {
+        partnerId: first.partner.id,
+        role: PartnerMemberRole.EMPLOYEE,
+        userId: employeeUser.id,
+      },
+    });
+    await prismaService.service.deleteMany({
+      where: { code: 'E2E_DETAILING' },
+    });
+
+    try {
+      const createResponse = await request(app.getHttpServer())
+        .post('/api/v1/partner/units')
+        .set('Authorization', 'Bearer partner-token')
+        .send({
+          addressNumber: '321',
+          city: 'Uberlândia',
+          name: 'Unidade Centro',
+          neighborhood: 'Centro',
+          phone: '3433333333',
+          postalCode: '38400-000',
+          state: 'mg',
+          street: 'Avenida Afonso Pena',
+          whatsapp: '34999999999',
+        })
+        .expect(201);
+      const unitId = (createResponse.body as { id: string }).id;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/partner/units/${unitId}`)
+        .set('Authorization', 'Bearer partner-token')
+        .send({ name: 'Unidade Centro Atualizada' })
+        .expect(200)
+        .expect(({ body }: { body: { name: string; status: string } }) => {
+          expect(body.name).toBe('Unidade Centro Atualizada');
+          expect(body.status).toBe(PartnerUnitStatus.DRAFT);
+        });
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/partner/units/${unitId}`)
+        .set('Authorization', 'Bearer other-partner-token')
+        .expect(404);
+      await request(app.getHttpServer())
+        .get(`/api/v1/partner/units/${unitId}`)
+        .set('Authorization', 'Bearer employee-token')
+        .expect(200);
+      await request(app.getHttpServer())
+        .patch(`/api/v1/partner/units/${unitId}`)
+        .set('Authorization', 'Bearer employee-token')
+        .send({ name: 'AlteraÃ§Ã£o proibida' })
+        .expect(403);
+      await request(app.getHttpServer())
+        .get('/api/v1/partner/units')
+        .set('Authorization', 'Bearer valid-token')
+        .expect(403);
+      await request(app.getHttpServer())
+        .get('/api/v1/admin/partner-units')
+        .set('Authorization', 'Bearer partner-token')
+        .expect(403);
+      await request(app.getHttpServer())
+        .delete(`/api/v1/partner/units/${unitId}`)
+        .set('Authorization', 'Bearer partner-token')
+        .expect(404);
+
+      const invalidHours = Array.from({ length: 7 }, (_, dayOfWeek) => ({
+        closesAt: dayOfWeek === 1 ? '08:00' : undefined,
+        dayOfWeek,
+        isClosed: dayOfWeek !== 1,
+        opensAt: dayOfWeek === 1 ? '18:00' : undefined,
+      }));
+      await request(app.getHttpServer())
+        .put(`/api/v1/partner/units/${unitId}/business-hours`)
+        .set('Authorization', 'Bearer partner-token')
+        .send({ items: invalidHours })
+        .expect(400)
+        .expect(({ body }: { body: { code: string } }) => {
+          expect(body.code).toBe('INVALID_BUSINESS_HOURS');
+        });
+
+      const closedDayWithHours = Array.from({ length: 7 }, (_, dayOfWeek) => ({
+        closesAt: dayOfWeek === 0 ? '18:00' : undefined,
+        dayOfWeek,
+        isClosed: true,
+        opensAt: dayOfWeek === 0 ? '08:00' : undefined,
+      }));
+      await request(app.getHttpServer())
+        .put(`/api/v1/partner/units/${unitId}/business-hours`)
+        .set('Authorization', 'Bearer partner-token')
+        .send({ items: closedDayWithHours })
+        .expect(400)
+        .expect(({ body }: { body: { code: string } }) => {
+          expect(body.code).toBe('CLOSED_DAY_HAS_HOURS');
+        });
+
+      const validHours = Array.from({ length: 7 }, (_, dayOfWeek) => ({
+        closesAt: dayOfWeek === 0 ? undefined : '18:00',
+        dayOfWeek,
+        isClosed: dayOfWeek === 0,
+        opensAt: dayOfWeek === 0 ? undefined : '08:00',
+      }));
+      await request(app.getHttpServer())
+        .put(`/api/v1/partner/units/${unitId}/business-hours`)
+        .set('Authorization', 'Bearer partner-token')
+        .send({ items: validHours })
+        .expect(200);
+
+      const service = await prismaService.service.findUniqueOrThrow({
+        where: { code: 'CAR_WASH' },
+      });
+      const serviceResponse = await request(app.getHttpServer())
+        .post('/api/v1/admin/services')
+        .set('Authorization', 'Bearer admin-token')
+        .send({
+          code: 'E2E_DETAILING',
+          description: 'Serviço temporário do teste integrado.',
+          name: 'Detalhamento E2E',
+        })
+        .expect(201);
+      const managedServiceId = (serviceResponse.body as { id: string }).id;
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/services/${managedServiceId}`)
+        .set('Authorization', 'Bearer admin-token')
+        .send({ name: 'Detalhamento atualizado' })
+        .expect(200)
+        .expect(({ body }: { body: { code: string; name: string } }) => {
+          expect(body.code).toBe('E2E_DETAILING');
+          expect(body.name).toBe('Detalhamento atualizado');
+        });
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/services/${managedServiceId}/status`)
+        .set('Authorization', 'Bearer admin-token')
+        .send({ status: 'INACTIVE' })
+        .expect(200);
+      await request(app.getHttpServer())
+        .put(`/api/v1/partner/units/${unitId}/services`)
+        .set('Authorization', 'Bearer partner-token')
+        .send({ serviceIds: [managedServiceId] })
+        .expect(400)
+        .expect(({ body }: { body: { code: string } }) => {
+          expect(body.code).toBe('INVALID_UNIT_SERVICES');
+        });
+      await request(app.getHttpServer())
+        .delete(`/api/v1/admin/services/${managedServiceId}`)
+        .set('Authorization', 'Bearer admin-token')
+        .expect(404);
+      const plan = await prismaService.plan.findFirstOrThrow({
+        where: { status: PlanStatus.ACTIVE },
+      });
+      await request(app.getHttpServer())
+        .put(`/api/v1/partner/units/${unitId}/services`)
+        .set('Authorization', 'Bearer partner-token')
+        .send({ serviceIds: [service.id] })
+        .expect(200);
+      await request(app.getHttpServer())
+        .put(`/api/v1/partner/units/${unitId}/vehicle-types`)
+        .set('Authorization', 'Bearer partner-token')
+        .send({ vehicleTypes: [VehicleType.HATCH, VehicleType.SEDAN] })
+        .expect(200);
+      await request(app.getHttpServer())
+        .put(`/api/v1/partner/units/${unitId}/plans`)
+        .set('Authorization', 'Bearer partner-token')
+        .send({ planIds: [plan.id] })
+        .expect(200);
+      await request(app.getHttpServer())
+        .put(`/api/v1/partner/units/${unitId}/plans`)
+        .set('Authorization', 'Bearer partner-token')
+        .send({ planIds: [randomUUID()] })
+        .expect(400)
+        .expect(({ body }: { body: { code: string } }) => {
+          expect(body.code).toBe('INVALID_UNIT_PLANS');
+        });
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/partner/units/${unitId}/status`)
+        .set('Authorization', 'Bearer partner-token')
+        .send({ status: PartnerUnitStatus.ACTIVE })
+        .expect(409)
+        .expect(
+          ({
+            body,
+          }: {
+            body: { code: string; missingRequirements: string[] };
+          }) => {
+            expect(body.code).toBe('UNIT_INCOMPLETE');
+            expect(body.missingRequirements).toEqual(['LOCATION']);
+          },
+        );
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/partner-units/${unitId}/status`)
+        .set('Authorization', 'Bearer admin-token')
+        .send({ status: PartnerUnitStatus.SUSPENDED })
+        .expect(200);
+      await request(app.getHttpServer())
+        .patch(`/api/v1/partner/units/${unitId}`)
+        .set('Authorization', 'Bearer partner-token')
+        .send({ name: 'AlteraÃ§Ã£o suspensa' })
+        .expect(403)
+        .expect(({ body }: { body: { code: string } }) => {
+          expect(body.code).toBe('UNIT_SUSPENDED');
+        });
+
+      await request(app.getHttpServer())
+        .get(
+          '/api/v1/admin/partner-units?partner=Auto%20Unit%20owner&status=SUSPENDED&city=Uberl%C3%A2ndia&state=MG',
+        )
+        .set('Authorization', 'Bearer admin-token')
+        .expect(200)
+        .expect(({ body }: { body: { items: Array<{ id: string }> } }) => {
+          expect(body.items.map(({ id }) => id)).toContain(unitId);
+        });
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/partner-units/${unitId}/status`)
+        .set('Authorization', 'Bearer admin-token')
+        .send({ status: PartnerUnitStatus.INACTIVE })
+        .expect(200)
+        .expect(({ body }: { body: { status: string } }) => {
+          expect(body.status).toBe(PartnerUnitStatus.INACTIVE);
+        });
+    } finally {
+      await prismaService.partnerUnit.deleteMany({
+        where: { partnerId: { in: [first.partner.id, second.partner.id] } },
+      });
+      await prismaService.partner.deleteMany({
+        where: { id: { in: [first.partner.id, second.partner.id] } },
+      });
+      await prismaService.partnerApplication.deleteMany({
+        where: { id: { in: [first.application.id, second.application.id] } },
+      });
+      await prismaService.service.deleteMany({
+        where: { code: 'E2E_DETAILING' },
+      });
+      await prismaService.user.deleteMany({
+        where: {
+          firebaseUid: {
+            in: [
+              partnerFirebaseUid,
+              otherPartnerFirebaseUid,
+              employeeFirebaseUid,
+            ],
+          },
+        },
+      });
     }
   });
 

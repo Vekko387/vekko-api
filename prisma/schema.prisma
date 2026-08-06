@@ -79,6 +79,18 @@ enum PartnerPhotoType {
   SERVICE_AREA
 }
 
+enum PartnerUnitStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum ServiceStatus {
+  ACTIVE
+  INACTIVE
+}
+
 model User {
   id                          String               @id @default(uuid()) @db.Uuid
   firebaseUid                 String               @unique(map: "users_firebase_uid_key") @map("firebase_uid") @db.VarChar(128)
@@ -142,6 +154,7 @@ model Plan {
   displayOrder         Int                      @map("display_order")
   benefit              PlanBenefit?
   vehicleEligibilities PlanVehicleEligibility[]
+  acceptedUnits        UnitAcceptedPlan[]
   createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt            DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -252,6 +265,7 @@ model Partner {
   application              PartnerApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
   members                  PartnerMember[]
   photos                   PartnerPhoto[]
+  units                    PartnerUnit[]
   createdAt                DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -284,4 +298,98 @@ model PartnerMember {
   @@id([partnerId, userId])
   @@index([userId], map: "partner_members_user_id_idx")
   @@map("partner_members")
+}
+
+model PartnerUnit {
+  id                   String             @id @default(uuid()) @db.Uuid
+  partnerId            String             @map("partner_id") @db.Uuid
+  name                 String             @db.VarChar(160)
+  postalCodeNormalized String             @map("postal_code_normalized") @db.VarChar(8)
+  street               String             @db.VarChar(160)
+  addressNumber        String             @map("address_number") @db.VarChar(30)
+  addressComplement    String?            @map("address_complement") @db.VarChar(120)
+  neighborhood         String             @db.VarChar(120)
+  city                 String             @db.VarChar(120)
+  state                String             @db.Char(2)
+  formattedAddress     String?            @map("formatted_address") @db.VarChar(500)
+  latitude             Decimal?           @db.Decimal(9, 6)
+  longitude            Decimal?           @db.Decimal(10, 6)
+  mapProviderId        String?            @map("map_provider_id") @db.VarChar(255)
+  lastGeocodedAt       DateTime?          @map("last_geocoded_at") @db.Timestamptz(3)
+  phoneNormalized      String             @map("phone_normalized") @db.VarChar(13)
+  whatsappNormalized   String?            @map("whatsapp_normalized") @db.VarChar(13)
+  status               PartnerUnitStatus  @default(DRAFT)
+  partner              Partner            @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  businessHours        BusinessHour[]
+  services             UnitService[]
+  vehicleTypes         UnitVehicleType[]
+  acceptedPlans        UnitAcceptedPlan[]
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([partnerId, status], map: "partner_units_partner_id_status_idx")
+  @@index([status, city, state], map: "partner_units_status_city_state_idx")
+  @@map("partner_units")
+}
+
+model BusinessHour {
+  unitId    String      @map("unit_id") @db.Uuid
+  dayOfWeek Int         @map("day_of_week")
+  opensAt   String?     @map("opens_at") @db.Char(5)
+  closesAt  String?     @map("closes_at") @db.Char(5)
+  isClosed  Boolean     @map("is_closed")
+  unit      PartnerUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@id([unitId, dayOfWeek])
+  @@map("business_hours")
+}
+
+model Service {
+  id          String        @id @default(uuid()) @db.Uuid
+  code        String        @unique(map: "services_code_key") @db.VarChar(60)
+  name        String        @db.VarChar(120)
+  description String?       @db.VarChar(500)
+  status      ServiceStatus @default(ACTIVE)
+  units       UnitService[]
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([status, name], map: "services_status_name_idx")
+  @@map("services")
+}
+
+model UnitService {
+  unitId    String      @map("unit_id") @db.Uuid
+  serviceId String      @map("service_id") @db.Uuid
+  unit      PartnerUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  service   Service     @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@id([unitId, serviceId])
+  @@index([serviceId], map: "unit_services_service_id_idx")
+  @@map("unit_services")
+}
+
+model UnitVehicleType {
+  unitId      String      @map("unit_id") @db.Uuid
+  vehicleType VehicleType @map("vehicle_type")
+  unit        PartnerUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@id([unitId, vehicleType])
+  @@map("unit_vehicle_types")
+}
+
+model UnitAcceptedPlan {
+  unitId    String      @map("unit_id") @db.Uuid
+  planId    String      @map("plan_id") @db.Uuid
+  unit      PartnerUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  plan      Plan        @relation(fields: [planId], references: [id], onDelete: Restrict)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@id([unitId, planId])
+  @@index([planId], map: "unit_accepted_plans_plan_id_idx")
+  @@map("unit_accepted_plans")
 }
