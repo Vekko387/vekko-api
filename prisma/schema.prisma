@@ -73,6 +73,12 @@ enum PartnerMemberRole {
   EMPLOYEE
 }
 
+enum PartnerPhotoType {
+  LOGO
+  FACADE
+  SERVICE_AREA
+}
+
 model User {
   id                          String               @id @default(uuid()) @db.Uuid
   firebaseUid                 String               @unique(map: "users_firebase_uid_key") @map("firebase_uid") @db.VarChar(128)
@@ -180,32 +186,38 @@ model UserRole {
 }
 
 model PartnerApplication {
-  id                   String                   @id @default(uuid()) @db.Uuid
-  legalName            String                   @map("legal_name") @db.VarChar(160)
-  tradeName            String                   @map("trade_name") @db.VarChar(160)
-  cnpjNormalized       String                   @map("cnpj_normalized") @db.VarChar(14)
-  responsibleName      String                   @map("responsible_name") @db.VarChar(160)
-  contactEmail         String                   @map("contact_email") @db.VarChar(320)
-  contactPhone         String                   @map("contact_phone") @db.VarChar(13)
-  postalCodeNormalized String                   @map("postal_code_normalized") @db.VarChar(8)
-  street               String                   @db.VarChar(160)
-  addressNumber        String                   @map("address_number") @db.VarChar(30)
-  addressComplement    String?                  @map("address_complement") @db.VarChar(120)
-  neighborhood         String                   @db.VarChar(120)
-  city                 String                   @db.VarChar(120)
-  state                String                   @db.Char(2)
-  businessCategory     String                   @map("business_category") @db.VarChar(100)
-  serviceDescription   String                   @map("service_description") @db.VarChar(1000)
-  status               PartnerApplicationStatus @default(PENDING_REVIEW)
-  termsAcceptedAt      DateTime                 @map("terms_accepted_at") @db.Timestamptz(3)
-  submittedAt          DateTime                 @default(now()) @map("submitted_at") @db.Timestamptz(3)
-  reviewedAt           DateTime?                @map("reviewed_at") @db.Timestamptz(3)
-  reviewedById         String?                  @map("reviewed_by_id") @db.Uuid
-  rejectionReason      String?                  @map("rejection_reason") @db.VarChar(500)
-  invitationSentAt     DateTime?                @map("invitation_sent_at") @db.Timestamptz(3)
-  reviewedBy           User?                    @relation("PartnerApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  partner              Partner?
-  updatedAt            DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                       String                   @id @default(uuid()) @db.Uuid
+  legalName                String                   @map("legal_name") @db.VarChar(160)
+  tradeName                String                   @map("trade_name") @db.VarChar(160)
+  cnpjNormalized           String                   @map("cnpj_normalized") @db.VarChar(14)
+  responsibleName          String                   @map("responsible_name") @db.VarChar(160)
+  responsibleCpfNormalized String?                  @map("responsible_cpf_normalized") @db.VarChar(11)
+  responsiblePhone         String                   @map("responsible_phone") @db.VarChar(13)
+  responsibleEmail         String                   @map("responsible_email") @db.VarChar(320)
+  responsibleRole          String                   @map("responsible_role") @db.VarChar(100)
+  contactEmail             String                   @map("contact_email") @db.VarChar(320)
+  contactPhone             String                   @map("contact_phone") @db.VarChar(13)
+  whatsappNormalized       String                   @map("whatsapp_normalized") @db.VarChar(13)
+  websiteOrInstagram       String?                  @map("website_or_instagram") @db.VarChar(255)
+  postalCodeNormalized     String                   @map("postal_code_normalized") @db.VarChar(8)
+  street                   String                   @db.VarChar(160)
+  addressNumber            String                   @map("address_number") @db.VarChar(30)
+  addressComplement        String?                  @map("address_complement") @db.VarChar(120)
+  neighborhood             String                   @db.VarChar(120)
+  city                     String                   @db.VarChar(120)
+  state                    String                   @db.Char(2)
+  businessCategory         String                   @map("business_category") @db.VarChar(100)
+  serviceDescription       String                   @map("service_description") @db.VarChar(1000)
+  status                   PartnerApplicationStatus @default(PENDING_REVIEW)
+  termsAcceptedAt          DateTime                 @map("terms_accepted_at") @db.Timestamptz(3)
+  submittedAt              DateTime                 @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  reviewedAt               DateTime?                @map("reviewed_at") @db.Timestamptz(3)
+  reviewedById             String?                  @map("reviewed_by_id") @db.Uuid
+  rejectionReason          String?                  @map("rejection_reason") @db.VarChar(500)
+  invitationSentAt         DateTime?                @map("invitation_sent_at") @db.Timestamptz(3)
+  reviewedBy               User?                    @relation("PartnerApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  partner                  Partner?
+  updatedAt                DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([contactEmail], map: "partner_applications_contact_email_idx")
   @@index([status, submittedAt], map: "partner_applications_status_submitted_at_idx")
@@ -213,29 +225,51 @@ model PartnerApplication {
 }
 
 model Partner {
-  id                   String             @id @default(uuid()) @db.Uuid
-  applicationId        String             @unique(map: "partners_application_id_key") @map("application_id") @db.Uuid
-  legalName            String             @map("legal_name") @db.VarChar(160)
-  tradeName            String             @map("trade_name") @db.VarChar(160)
-  cnpjNormalized       String             @unique(map: "partners_cnpj_normalized_key") @map("cnpj_normalized") @db.VarChar(14)
-  contactEmail         String             @map("contact_email") @db.VarChar(320)
-  contactPhone         String             @map("contact_phone") @db.VarChar(13)
-  postalCodeNormalized String             @map("postal_code_normalized") @db.VarChar(8)
-  street               String             @db.VarChar(160)
-  addressNumber        String             @map("address_number") @db.VarChar(30)
-  addressComplement    String?            @map("address_complement") @db.VarChar(120)
-  neighborhood         String             @db.VarChar(120)
-  city                 String             @db.VarChar(120)
-  state                String             @db.Char(2)
-  businessCategory     String             @map("business_category") @db.VarChar(100)
-  serviceDescription   String             @map("service_description") @db.VarChar(1000)
-  status               PartnerStatus      @default(ACTIVE)
-  application          PartnerApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
-  members              PartnerMember[]
-  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                       String             @id @default(uuid()) @db.Uuid
+  applicationId            String             @unique(map: "partners_application_id_key") @map("application_id") @db.Uuid
+  legalName                String             @map("legal_name") @db.VarChar(160)
+  tradeName                String             @map("trade_name") @db.VarChar(160)
+  cnpjNormalized           String             @unique(map: "partners_cnpj_normalized_key") @map("cnpj_normalized") @db.VarChar(14)
+  responsibleName          String             @map("responsible_name") @db.VarChar(160)
+  responsibleCpfNormalized String?            @map("responsible_cpf_normalized") @db.VarChar(11)
+  responsiblePhone         String             @map("responsible_phone") @db.VarChar(13)
+  responsibleEmail         String             @map("responsible_email") @db.VarChar(320)
+  responsibleRole          String             @map("responsible_role") @db.VarChar(100)
+  contactEmail             String             @map("contact_email") @db.VarChar(320)
+  contactPhone             String             @map("contact_phone") @db.VarChar(13)
+  whatsappNormalized       String             @map("whatsapp_normalized") @db.VarChar(13)
+  websiteOrInstagram       String?            @map("website_or_instagram") @db.VarChar(255)
+  postalCodeNormalized     String             @map("postal_code_normalized") @db.VarChar(8)
+  street                   String             @db.VarChar(160)
+  addressNumber            String             @map("address_number") @db.VarChar(30)
+  addressComplement        String?            @map("address_complement") @db.VarChar(120)
+  neighborhood             String             @db.VarChar(120)
+  city                     String             @db.VarChar(120)
+  state                    String             @db.Char(2)
+  businessCategory         String             @map("business_category") @db.VarChar(100)
+  serviceDescription       String             @map("service_description") @db.VarChar(1000)
+  status                   PartnerStatus      @default(ACTIVE)
+  application              PartnerApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  members                  PartnerMember[]
+  photos                   PartnerPhoto[]
+  createdAt                DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("partners")
+}
+
+model PartnerPhoto {
+  id        String           @id @default(uuid()) @db.Uuid
+  partnerId String           @map("partner_id") @db.Uuid
+  type      PartnerPhotoType
+  url       String           @db.VarChar(2048)
+  partner   Partner          @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([partnerId, type], map: "partner_photos_partner_id_type_key")
+  @@index([partnerId], map: "partner_photos_partner_id_idx")
+  @@map("partner_photos")
 }
 
 model PartnerMember {

@@ -28,6 +28,7 @@ import {
   PartnerApplicationResponseDto,
 } from './dto/partner-application-response.dto';
 import { RejectPartnerApplicationDto } from './dto/reject-partner-application.dto';
+import { UpdatePartnerApplicationDto } from './dto/update-partner-details.dto';
 import { PartnerApplicationsService } from './services/partner-applications.service';
 import { PartnerApprovalService } from './services/partner-approval.service';
 
@@ -60,6 +61,18 @@ export class AdminPartnerApplicationsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<PartnerApplicationResponseDto> {
     return this.partnerApplicationsService.findOne(id);
+  }
+
+  @ApiOperation({ summary: 'Edita uma solicitação ainda pendente.' })
+  @ApiOkResponse({ type: PartnerApplicationResponseDto })
+  @ApiNotFoundResponse({ description: 'Solicitação não encontrada.' })
+  @ApiConflictResponse({ description: 'A solicitação já foi analisada.' })
+  @Patch(':id')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() input: UpdatePartnerApplicationDto,
+  ): Promise<PartnerApplicationResponseDto> {
+    return this.partnerApplicationsService.update(id, input);
   }
 
   @ApiOperation({ summary: 'Aprova e provisiona o proprietário parceiro.' })

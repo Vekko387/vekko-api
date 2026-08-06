@@ -38,4 +38,13 @@ export default () => ({
     keyPrefix: process.env.REDIS_KEY_PREFIX ?? 'vekko:development',
     url: process.env.REDIS_URL,
   },
+  storage: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    bucket: process.env.R2_BUCKET,
+    endpoint: process.env.R2_ENDPOINT,
+    prefix: process.env.R2_PREFIX ?? process.env.NODE_ENV ?? 'development',
+    publicBaseUrl: process.env.R2_PUBLIC_BASE_URL,
+    region: process.env.R2_REGION ?? 'auto',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
 });

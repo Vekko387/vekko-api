@@ -56,6 +56,29 @@ export class CreatePartnerApplicationDto {
   @MaxLength(160)
   responsibleName: string;
 
+  @ApiProperty({ example: '52998224725' })
+  @Transform(digits)
+  @Matches(/^\d{11}$/u)
+  responsibleCpf: string;
+
+  @ApiProperty({ example: '34999998888' })
+  @Transform(digits)
+  @Matches(/^\d{10,13}$/u)
+  responsiblePhone: string;
+
+  @ApiProperty({ example: 'responsavel@exemplo.com' })
+  @Transform(email)
+  @IsEmail()
+  @MaxLength(320)
+  responsibleEmail: string;
+
+  @ApiProperty({ example: 'Proprietária' })
+  @Transform(trim)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  responsibleRole: string;
+
   @ApiProperty({ example: 'parceiro@exemplo.com' })
   @Transform(email)
   @IsEmail()
@@ -66,6 +89,18 @@ export class CreatePartnerApplicationDto {
   @Transform(digits)
   @Matches(/^\d{10,13}$/u)
   contactPhone: string;
+
+  @ApiProperty({ example: '85999999999' })
+  @Transform(digits)
+  @Matches(/^\d{10,13}$/u)
+  whatsapp: string;
+
+  @ApiPropertyOptional({ example: 'https://instagram.com/autocenter' })
+  @Transform(trim)
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  websiteOrInstagram?: string;
 
   @ApiProperty({ example: '60160120' })
   @Transform(digits)
